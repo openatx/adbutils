@@ -18,7 +18,14 @@ from adbutils import adb
 for d in adb.devices():
     print(d.serial) # 获取序列号
     print(d.shell_output("getprop", "ro.serial")) # 获取Prop信息
-    d.sync.push(io.Bytes(b"Hello Android"), "/data/local/tmp/hi.txt") # 推送文件
+    d.sync.push(io.BytesIO(b"Hello Android"), "/data/local/tmp/hi.txt") # 推送文件
+
+    # 读取文件
+    for chunk in d.sync.iter_content("/data/local/tmp/hi.txt"):
+        print("Chunk", chunk)
+
+    # 拷贝到本地
+    d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
 ```
 
 For more usage, please see the code for details. (Sorry I'm too lazy.)

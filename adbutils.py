@@ -376,7 +376,7 @@ class Sync():
                 if hasattr(r, "close"):
                     r.close()
 
-    def pull(self, path):
+    def iter_content(self, path):
         assert isinstance(path, six.string_types)
         with self._prepare_sync(path, "RECV") as c:
             while True:
@@ -388,7 +388,18 @@ class Sync():
                 chunk = c.read_raw(chunk_size)
                 if len(chunk) != chunk_size:
                     raise RuntimeError("read chunk missing")
-                print("Chunk:", chunk)
+                yield chunk
+
+    def pull(self, src, dst):
+        assert isinstance(src, six.string_types)
+        assert isinstance(dst, six.string_types)
+
+        with open(dst, 'wb') as f:
+            size = 0
+            for chunk in self.iter_content(src):
+                f.write(chunk)
+                size += len(chunk)
+            return size
 
 
 adb = AdbClient()
