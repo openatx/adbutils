@@ -10,6 +10,7 @@ import stat
 import socket
 import struct
 import subprocess
+import time
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -141,7 +142,7 @@ class AdbClient(object):
         Args:
             serial (str)
             command: list, tuple or str
-        
+
         Returns:
             str
         """
@@ -173,7 +174,7 @@ class AdbClient(object):
             serial (str): device serial
             local, remote (str): tcp:<port> or localabstract:<name>
             norebind (bool): fail if already forwarded when set to true
-        
+
         Raises:
             AdbError
         """
@@ -366,7 +367,7 @@ class Sync():
                 while True:
                     chunk = r.read(4096)
                     if not chunk:
-                        mtime = int(datetime.datetime.now().timestamp())
+                        mtime = int(time.time())
                         c.conn.send(b"DONE" + struct.pack("<I", mtime))
                         break
                     c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
