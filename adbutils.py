@@ -62,7 +62,6 @@ class _AdbStreamConnection(object):
                                                  "127.0.0.1")
         adb_port = self.__port or int(
             os.environ.get("ANDROID_ADB_SERVER_PORT", 5037))
-        self.__conn
         s = self.__conn = socket.socket()
         s.connect((adb_host, adb_port))
         return self
@@ -80,16 +79,13 @@ class _AdbStreamConnection(object):
     def conn(self):
         return self.__conn
 
-    def send(self, cmd):
-        assert isinstance(cmd, six.string_types)
+    def send(self, cmd: str):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
-    def read(self, n):
-        assert isinstance(n, int)
+    def read(self, n: int) -> str:
         return self.conn.recv(n).decode()
 
-    def read_raw(self, n):
-        assert isinstance(n, int)
+    def read_raw(self, n: int) -> bytes:
         t = n
         buffer = b''
         while t > 0:
@@ -100,11 +96,11 @@ class _AdbStreamConnection(object):
             t = n - len(buffer)
         return buffer
 
-    def read_string(self):
+    def read_string(self) -> str:
         size = int(self.read(4), 16)
         return self.read(size)
 
-    def read_until_close(self):
+    def read_until_close(self) -> str:
         content = ""
         while True:
             chunk = self.read(4096)
@@ -123,7 +119,7 @@ class _AdbStreamConnection(object):
 
 
 class AdbClient(object):
-    def connect(self):
+    def _connect(self):
         return _AdbStreamConnection()
 
     def server_version(self):
@@ -131,12 +127,12 @@ class AdbClient(object):
         Returns:
             int
         """
-        with self.connect() as c:
+        with self._connect() as c:
             c.send("host:version")
             c.check_okay()
             return int(c.read_string(), 16)
 
-    def shell(self, serial, command):
+    def shell(self, serial, command) -> str:
         """Run shell in android and return output
         Args:
             serial (str)
@@ -149,7 +145,7 @@ class AdbClient(object):
         if isinstance(command, (list, tuple)):
             command = subprocess.list2cmdline(command)
         assert isinstance(command, six.string_types)
-        with self.connect() as c:
+        with self._connect() as c:
             c.send("host:transport:" + serial)
             c.check_okay()
             c.send("shell:" + command)
@@ -157,7 +153,7 @@ class AdbClient(object):
             return c.read_until_close()
 
     def forward_list(self):
-        with self.connect() as c:
+        with self._connect() as c:
             c.send("host:list-forward")
             c.check_okay()
             content = c.read_string()
@@ -177,7 +173,7 @@ class AdbClient(object):
         Raises:
             AdbError
         """
-        with self.connect() as c:
+        with self._connect() as c:
             cmds = ["host-serial", serial, "forward"]
             if norebind:
                 cmds.append("norebind")
@@ -190,7 +186,7 @@ class AdbClient(object):
         Returns:
             list of DeviceItem
         """
-        with self.connect() as c:
+        with self._connect() as c:
             c.send("host:devices")
             c.check_okay()
             output = c.read_string()
@@ -201,7 +197,7 @@ class AdbClient(object):
                 if parts[1] == 'device':
                     yield AdbDevice(self, parts[0])
 
-    def devices(self):
+    def devices(self) -> list:
         return list(self.iter_device())
 
     def must_one_device(self):
@@ -224,7 +220,7 @@ class AdbClient(object):
 
 
 class AdbDevice(object):
-    def __init__(self, client, serial):
+    def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
 
@@ -262,10 +258,11 @@ class AdbDevice(object):
                     "subprocess", cmdline,
                     e.output.decode('utf-8', errors='ignore'))
 
-    def shell_output(self, *args):
+    def shell_output(self, *args) -> str:
         return self._client.shell(self._serial, subprocess.list2cmdline(args))
 
-    def forward_port(self, remote_port):
+    def forward_port(self, remote_port) -> int:
+        """ forward remote port to local random port """
         assert isinstance(remote_port, int)
         for f in self._client.forward_list():
             if f.serial == self._serial and f.remote == 'tcp:' + str(
@@ -276,29 +273,23 @@ class AdbDevice(object):
                              "tcp:" + str(remote_port))
         return local_port
 
-    def push(self, local, remote):
-        assert isinstance(local, six.string_types)
-        assert isinstance(remote, six.string_types)
+    def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
 
-    def install(self, apk_path):
+    def install(self, apk_path: str):
         """
         sdk = self.getprop('ro.build.version.sdk')
         sdk > 23 support -g
         """
-        assert isinstance(apk_path, six.string_types)
         self.adb_output("install", "-r", apk_path)
 
-    def uninstall(self, pkg_name):
-        assert isinstance(pkg_name, six.string_types)
+    def uninstall(self, pkg_name: str):
         self.adb_output("uninstall", pkg_name)
 
-    def getprop(self, prop):
-        assert isinstance(prop, six.string_types)
+    def getprop(self, prop: str) -> str:
         return self.shell_output('getprop', prop).strip()
 
-    def package_info(self, pkg_name):
-        assert isinstance(pkg_name, six.string_types)
+    def package_info(self, pkg_name: str) -> dict:
         output = self.shell_output('dumpsys', 'package', pkg_name)
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
         version_name = m.group('name') if m else None
@@ -310,14 +301,14 @@ class AdbDevice(object):
 
 
 class Sync():
-    def __init__(self, adbclient, serial):
+    def __init__(self, adbclient: AdbClient, serial: str):
         self._adbclient = adbclient
         self._serial = serial
         # self._path = path
 
     @contextmanager
     def _prepare_sync(self, path, cmd):
-        c = self._adbclient.connect()
+        c = self._adbclient._connect()
         try:
             c.send(":".join(["host", "transport", self._serial]))
             c.check_okay()
@@ -331,16 +322,14 @@ class Sync():
         finally:
             c.close()
 
-    def stat(self, path):
-        assert isinstance(path, six.string_types)
+    def stat(self, path: str) -> FileInfo:
         with self._prepare_sync(path, "STAT") as c:
             assert "STAT" == c.read(4)
             mode, size, mtime = struct.unpack("<III", c.conn.recv(12))
             return FileInfo(mode, size, datetime.datetime.fromtimestamp(mtime),
                             path)
 
-    def iter_directory(self, path):
-        assert isinstance(path, six.string_types)
+    def iter_directory(self, path: str):
         with self._prepare_sync(path, "LIST") as c:
             while 1:
                 response = c.read(4)
@@ -352,13 +341,12 @@ class Sync():
                 yield FileInfo(mode, size,
                                datetime.datetime.fromtimestamp(mtime), name)
 
-    def list(self, path):
+    def list(self, path: str):
         return list(self.iter_directory(path))
 
-    def push(self, src, dst, mode=0o755):
+    def push(self, src, dst: str, mode: int = 0o755):
         # IFREG: File Regular
         # IFDIR: File Directory
-        assert isinstance(dst, six.string_types)
         path = dst + "," + str(stat.S_IFREG | mode)
         with self._prepare_sync(path, "SEND") as c:
             r = src if hasattr(src, "read") else open(src, "rb")
@@ -376,8 +364,7 @@ class Sync():
                 if hasattr(r, "close"):
                     r.close()
 
-    def iter_content(self, path):
-        assert isinstance(path, six.string_types)
+    def iter_content(self, path: str):
         with self._prepare_sync(path, "RECV") as c:
             while True:
                 cmd = c.read(4)
@@ -390,10 +377,13 @@ class Sync():
                     raise RuntimeError("read chunk missing")
                 yield chunk
 
-    def pull(self, src, dst):
-        assert isinstance(src, six.string_types)
-        assert isinstance(dst, six.string_types)
+    def pull(self, src: str, dst: str) -> int:
+        """
+        Pull file from device:src to local:dst
 
+        Returns:
+            file size
+        """
         with open(dst, 'wb') as f:
             size = 0
             for chunk in self.iter_content(src):
@@ -412,13 +402,17 @@ if __name__ == "__main__":
     print(d.serial)
     for f in adb.sync(d.serial).iter_directory("/data/local/tmp"):
         print(f)
-    # adb.listdir(d.serial, "/data/local/tmp/")
+
     finfo = adb.sync(d.serial).stat("/data/local/tmp")
     print(finfo)
     import io
     sync = adb.sync(d.serial)
+    filepath = "/data/local/tmp/hi.txt"
     sync.push(
-        io.BytesIO(b"hi5a4de5f4qa6we541fq6w1ef5a61f65ew1rf6we"),
-        "/data/local/tmp/hi.txt", 0o644)
-    # sync.mkdir("/data/local/tmp/foo")
-    sync.pull("/data/local/tmp/hi.txt")
+        io.BytesIO(b"hi5a4de5f4qa6we541fq6w1ef5a61f65ew1rf6we"), filepath,
+        0o644)
+
+    print("FileInfo", sync.stat(filepath))
+    for chunk in sync.iter_content(filepath):
+        print(chunk)
+    # sync.pull(filepath)
