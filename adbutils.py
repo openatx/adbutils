@@ -137,7 +137,7 @@ class AdbClient(object):
         Args:
             serial (str)
             command: list, tuple or str
-        
+
         Returns:
             str
         """
@@ -169,7 +169,7 @@ class AdbClient(object):
             serial (str): device serial
             local, remote (str): tcp:<port> or localabstract:<name>
             norebind (bool): fail if already forwarded when set to true
-        
+
         Raises:
             AdbError
         """
@@ -289,15 +289,25 @@ class AdbDevice(object):
     def getprop(self, prop: str) -> str:
         return self.shell_output('getprop', prop).strip()
 
-    def package_info(self, pkg_name: str) -> dict:
+    def package_info(self, pkg_name: str):
+        """
+        version_code might be ""
+
+        Returns:
+            None or dict
+        """
         output = self.shell_output('dumpsys', 'package', pkg_name)
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
-        version_name = m.group('name') if m else None
+        version_name = m.group('name') if m else ""
+        m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
+        version_code = m.group('code') if m else ""
+        if version_code == "0":
+            version_code = ""
         m = re.search(r'PackageSignatures\{(.*?)\}', output)
         signature = m.group(1) if m else None
         if version_name is None and signature is None:
             return None
-        return dict(version_name=version_name, signature=signature)
+        return dict(version_name=version_name, version_code=version_code, signature=signature)
 
 
 class Sync():
