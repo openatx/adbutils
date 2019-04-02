@@ -227,15 +227,16 @@ class AdbClient(object):
             )
         return ds[0]
 
-    # def device(self, serial:str):
-    #     return AdbDevice(self, serial)
-
     def device_with_serial(self, serial=None) -> 'AdbDevice':
+        print("Deprecated, use device(serial=serial) instead")
         if not serial:
             return self.must_one_device()
         return AdbDevice(self, serial)
 
-    def sync(self, serial):
+    def device(self, serial=None) -> 'AdbDevice':
+        return self.device_with_serial(serial)
+
+    def sync(self, serial) -> 'Sync':
         return Sync(self, serial)
 
 
@@ -379,11 +380,15 @@ class AdbDevice(object):
         Returns:
             (width, height)
         """
-        output = self.shell_output("wm size")
+        output = self.shell_output("wm", "size")
         m = re.match(r"Physical size: (\d+)x(\d+)", output)
         if m:
-            return map(int, m.groups())
+            return list(map(int, m.groups()))
         raise RuntimeError("Can't parse wm size: " + output)
+
+    def app_start(self, package_name: str):
+        self.shell_output("monkey", "-p", package_name, "-c",
+                          "android.intent.category.LAUNCHER", "1")
 
 
 class Sync():
