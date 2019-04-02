@@ -315,7 +315,10 @@ class AdbDevice(object):
         #     self.shell_output("rm", dst)
         # self.adb_output("install", "-r", apk_path)
 
-    def install_remote(self, remote_path: str, clean: bool = False):
+    def install_remote(self,
+                       remote_path: str,
+                       clean: bool = False,
+                       flags: list = ["-r", "-t"]):
         """
         Args:
             clean(bool): remove when installed
@@ -323,7 +326,8 @@ class AdbDevice(object):
         Raises:
             AdbInstallError
         """
-        output = self.shell_output("pm", "install", "-t", remote_path)
+        args = ["pm", "install"] + flags + [remote_path]
+        output = self.shell_output(*args)
         if "Success" not in output:
             raise AdbInstallError(output)
         if clean:

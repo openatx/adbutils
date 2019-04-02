@@ -105,7 +105,9 @@ def main():
             fd = open(args.install, "rb")
             r = ReadProgress(fd, length)
 
+        start = time.time()
         d.sync.push(r, dst)
+        print("Success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
         d.shell_output("mv", dst, new_dst)
@@ -117,7 +119,10 @@ def main():
 
         print("install to android system ...")
         try:
+            start = time.time()
             d.install_remote(dst, clean=True)
+            print("Success installed, time used %d seconds" %
+                  (time.time() - start))
         except AdbInstallError as e:
             sys.exit("Failure " + e.reason + "\n" +
                      "Remote apk is not removed. Manually install command:\n\t"
