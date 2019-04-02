@@ -7,8 +7,8 @@
 from __future__ import print_function
 
 import setuptools
-# import sys
 
+# import sys
 # if sys.version_info < (3, 6):
 #     error = """
 # Error: adbutils only support Python 3.6 and above.
@@ -19,8 +19,4 @@ import setuptools
 #     print(error, file=sys.stderr)
 #     sys.exit(1)
 
-setuptools.setup(
-    setup_requires=['pbr'],
-    python_requires='>=2.7',
-    pbr=True,
-    py_modules=["adbutils"])
+setuptools.setup(setup_requires=['pbr'], python_requires='>=3.6', pbr=True)

@@ -28,6 +28,21 @@ for d in adb.devices():
     d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
 ```
 
+命令行使用
+
+```bash
+# 安装本地apk(带有进度)
+$ python -m adbutils -i some.apk
+# 通过URL安装apk(带有进度)
+$ python -m adbutils -i http://example.com/some.apk
+
+# 卸载应用
+$ python -m adbutils -u com.github.example
+
+# 列出所有应用
+$ python -m adbutils -l
+```
+
 For more usage, please see the code for details. (Sorry I'm too lazy.)
 
 # Thanks

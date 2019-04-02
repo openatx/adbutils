@@ -6,12 +6,14 @@ from __future__ import print_function
 import datetime
 import os
 import re
-import stat
 import socket
+import stat
 import struct
 import subprocess
+import time
 from collections import namedtuple
 from contextlib import contextmanager
+from typing import Union
 
 import six
 import whichcraft
@@ -47,10 +49,25 @@ class AdbError(Exception):
     """ adb error """
 
 
+class AdbInstallError(AdbError):
+    def __init__(self, output: str):
+        """
+        Errors examples:
+        Failure [INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install io.appium.android.apis without first uninstalling.]
+        Error: Failed to parse APK file: android.content.pm.PackageParser$PackageParserException: Failed to parse /data/local/tmp/tmp-29649242.apk
+
+        Reference: https://github.com/mzlogin/awesome-adb
+        """
+        m = re.search(r"Failure \[([\w_]+)", output)
+        self.reason = m.group(1) if m else "Unknown"
+        self.output = output
+
+    def __str__(self):
+        return self.output
+
+
 class _AdbStreamConnection(object):
     def __init__(self, host=None, port=None):
-        # assert isinstance(host, six.string_types)
-        # assert isinstance(port, int)
         self.__host = host
         self.__port = port
         self.__conn = None
@@ -210,7 +227,10 @@ class AdbClient(object):
             )
         return ds[0]
 
-    def device_with_serial(self, serial=None):
+    # def device(self, serial:str):
+    #     return AdbDevice(self, serial)
+
+    def device_with_serial(self, serial=None) -> 'AdbDevice':
         if not serial:
             return self.must_one_device()
         return AdbDevice(self, serial)
@@ -232,7 +252,7 @@ class AdbDevice(object):
         return "AdbDevice(serial={})".format(self.serial)
 
     @property
-    def sync(self):
+    def sync(self) -> 'Sync':
         return Sync(self._client, self.serial)
 
     def adb_output(self, *args, **kwargs):
@@ -280,18 +300,56 @@ class AdbDevice(object):
         """
         sdk = self.getprop('ro.build.version.sdk')
         sdk > 23 support -g
+        
+        Raises:
+            AdbInstallError
         """
-        self.adb_output("install", "-r", apk_path)
+        dst = "/data/local/tmp/tmp-{}.apk".format(int(time.time() * 1000))
+        self.sync.push(apk_path, dst)
+        self.install_remote(dst, clean=True)
+        # try:
+        #     output = self.shell_output("pm", "install", "-r", "-t", dst)
+        #     if "Success" not in output:
+        #         raise AdbError(output)
+        # finally:
+        #     self.shell_output("rm", dst)
+        # self.adb_output("install", "-r", apk_path)
+
+    def install_remote(self, remote_path: str, clean: bool = False):
+        """
+        Args:
+            clean(bool): remove when installed
+
+        Raises:
+            AdbInstallError
+        """
+        output = self.shell_output("pm", "install", "-t", remote_path)
+        if "Success" not in output:
+            raise AdbInstallError(output)
+        if clean:
+            self.shell_output("rm", remote_path)
 
     def uninstall(self, pkg_name: str):
-        self.adb_output("uninstall", pkg_name)
+        return self.shell_output("pm", "uninstall", pkg_name)
+        # self.adb_output("uninstall", pkg_name)
 
     def getprop(self, prop: str) -> str:
         return self.shell_output('getprop', prop).strip()
 
-    def package_info(self, pkg_name: str):
+    def list_packages(self) -> list:
         """
-        version_code might be ""
+        Returns:
+            list of package names
+        """
+        result = []
+        output = self.shell_output("pm", "list", "packages", "-3")
+        for m in re.finditer(r'^package:([^\s]+)$', output, re.M):
+            result.append(m.group(1))
+        return list(sorted(result))
+
+    def package_info(self, pkg_name: str) -> Union[dict, None]:
+        """
+        version_code might be empty
 
         Returns:
             None or dict
@@ -307,7 +365,21 @@ class AdbDevice(object):
         signature = m.group(1) if m else None
         if version_name is None and signature is None:
             return None
-        return dict(version_name=version_name, version_code=version_code, signature=signature)
+        return dict(
+            version_name=version_name,
+            version_code=version_code,
+            signature=signature)
+
+    def window_size(self):
+        """get window size
+        Returns:
+            (width, height)
+        """
+        output = self.shell_output("wm size")
+        m = re.match(r"Physical size: (\d+)x(\d+)", output)
+        if m:
+            return map(int, m.groups())
+        raise RuntimeError("Can't parse wm size: " + output)
 
 
 class Sync():
@@ -358,6 +430,7 @@ class Sync():
         # IFREG: File Regular
         # IFDIR: File Directory
         path = dst + "," + str(stat.S_IFREG | mode)
+        total_size = 0
         with self._prepare_sync(path, "SEND") as c:
             r = src if hasattr(src, "read") else open(src, "rb")
             try:
@@ -369,10 +442,13 @@ class Sync():
                         break
                     c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
                     c.conn.send(chunk)
+                    total_size += len(chunk)
                 assert c.read(4) == _OKAY
             finally:
                 if hasattr(r, "close"):
                     r.close()
+        # wait until really pushed
+        # print("TotalSize", total_size, self.stat(dst))
 
     def iter_content(self, path: str):
         with self._prepare_sync(path, "RECV") as c:
