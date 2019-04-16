@@ -26,6 +26,11 @@ for d in adb.devices():
 
     # 拷贝到本地
     d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
+
+    # 获取包的信息
+    info = d.package_info("com.example.demo")
+    if info:
+        print(info) # expect {"version_name": "1.2.3", "version_code": "12", "signature": "0xff132"}
 ```
 
 命令行使用
