@@ -1,5 +1,6 @@
 # adbutils
 [![Build Status](https://travis-ci.org/openatx/adbutils.svg?branch=master)](https://travis-ci.org/openatx/adbutils)
+![PyPI](https://img.shields.io/pypi/v/adbutils.svg?color=blue)
 
 Python adb library for adb service
 
