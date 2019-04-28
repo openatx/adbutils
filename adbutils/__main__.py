@@ -88,8 +88,13 @@ def main():
     parser.add_argument(
         "-l", "--list", action="store_true", help="list packages installed")
     parser.add_argument("--grep", help="filter matched package names")
+    parser.add_argument("--connect", type=str, help="connect remote device")
     args = parser.parse_args()
 
+    if args.connect:
+        adbclient.connect(args.connect)
+        return
+        
     d = adbclient.device_with_serial(args.serial)
 
     if args.install:

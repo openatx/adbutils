@@ -1,3 +1,4 @@
 whichcraft
 requests
 six
+deprecation>=2.0.6,<3.0

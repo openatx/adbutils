@@ -15,8 +15,10 @@ from collections import namedtuple
 from contextlib import contextmanager
 from typing import Union
 
+import pkg_resources
 import six
 import whichcraft
+from deprecation import deprecated
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -26,6 +28,11 @@ _DONE = "DONE"
 DeviceItem = namedtuple("Device", ["serial", "status"])
 ForwardItem = namedtuple("ForwardItem", ["serial", "local", "remote"])
 FileInfo = namedtuple("FileInfo", ['mode', 'size', 'mtime', 'name'])
+
+try:
+    __version__ = pkg_resources.get_distribution("adbutils").version
+except pkg_resources.DistributionNotFound:
+    __version__ = "0.0.1"
 
 
 def get_free_port():
@@ -136,8 +143,12 @@ class _AdbStreamConnection(object):
 
 
 class AdbClient(object):
+    def __init__(self, host=None, port=None):
+        self.__host = host
+        self.__port = port
+
     def _connect(self):
-        return _AdbStreamConnection()
+        return _AdbStreamConnection(self.__host, self.__port)
 
     def server_version(self):
         """ 40 will match 1.0.40
@@ -227,14 +238,20 @@ class AdbClient(object):
             )
         return ds[0]
 
+    @deprecated(
+        deprecated_in="0.2.1",
+        removed_in="0.3.0",
+        current_version=__version__,
+        details="use device(serial=serial) instead")
     def device_with_serial(self, serial=None) -> 'AdbDevice':
-        print("Deprecated, use device(serial=serial) instead")
         if not serial:
             return self.must_one_device()
         return AdbDevice(self, serial)
 
     def device(self, serial=None) -> 'AdbDevice':
-        return self.device_with_serial(serial)
+        if not serial:
+            return self.must_one_device()
+        return AdbDevice(self, serial)
 
     def sync(self, serial) -> 'Sync':
         return Sync(self, serial)
@@ -279,6 +296,26 @@ class AdbDevice(object):
                     "subprocess", cmdline,
                     e.output.decode('utf-8', errors='ignore'))
 
+    def shell(self, cmdargs: Union[str, list, tuple]) -> str:
+        """Run shell inside device and get it's content
+
+        Returns:
+            string of output
+        
+        Examples:
+            shell("ls -l")
+            shell(["ls", "-l"])
+            shell("ls | grep data")
+        """
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = subprocess.list2cmdline(cmdargs)
+        return self._client.shell(self._serial, cmdargs)
+
+    @deprecated(
+        deprecated_in="0.2.4",
+        removed_in="0.3.0",
+        current_version=__version__,
+        details="use shell function instead, eg shell(\"ls -l\")")
     def shell_output(self, *args) -> str:
         return self._client.shell(self._serial, subprocess.list2cmdline(args))
 
@@ -488,6 +525,8 @@ class Sync():
 
 
 adb = AdbClient()
+# device = adb.device
+# devices = adb.devices
 
 if __name__ == "__main__":
     print("server version:", adb.server_version())
