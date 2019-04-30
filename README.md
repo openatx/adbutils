@@ -36,6 +36,25 @@ d = adb.device(serial="33ff22xx")
 d = adb.device()
 ```
 
+The following code will not write `from adbutils import adb` for short
+
+## List forward
+Same as `adb forward --list`
+
+```python
+# list all forwards
+for item in adb.forward_list():
+    print(item.serial, item.local, item.remote)
+    # 8d1f93be tcp:10603 tcp:7912
+    # 12345678 tcp:10664 tcp:7912
+
+# list only one device forwards
+for item in adb.forward_list("8d1f93be"):
+    print(item.serial, item.local, item.remote)
+    # 8d1f93be tcp:10603 tcp:7912
+    # 12345678 tcp:10664 tcp:7912
+```
+
 ## Run shell command and transfer files
 I assume there is only one device connected.
 
