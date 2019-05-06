@@ -84,6 +84,15 @@ if info:
 ## Run in command line 命令行使用
 
 ```bash
+# List devices
+$ python -m adbutils -l
+8d1f93be              MI 5s
+192.168.190.101:5555  Google Nexus 5X - 7.0.0 - API 24 - 1080x1920
+
+# Show adb server version
+$ python -m adbutils -V
+39
+
 # Install apk from local filesystem 安装本地apk(带有进度)
 $ python -m adbutils -i some.apk
 # Install apk from URL 通过URL安装apk(带有进度)
@@ -93,7 +102,11 @@ $ python -m adbutils -i http://example.com/some.apk
 $ python -m adbutils -u com.github.example
 
 # List installed packages 列出所有应用
-$ python -m adbutils -l
+$ python -m adbutils --list-packages
+com.android.adbkeyboard
+com.buscode.whatsinput
+com.finalwire.aida64
+com.github.uiautomator
 ```
 
 For more usage, please see the code for details. (Sorry I'm too lazy.)

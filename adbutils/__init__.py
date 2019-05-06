@@ -301,8 +301,11 @@ class AdbDevice(object):
                     "subprocess", cmdline,
                     e.output.decode('utf-8', errors='ignore'))
 
-    def shell(self, cmdargs: Union[str, list, tuple]) -> str:
+    def shell(self, cmdargs: Union[str, list, tuple], rstrip=True) -> str:
         """Run shell inside device and get it's content
+
+        Args:
+            rstrip (bool): strip the last empty line (Default: True)
 
         Returns:
             string of output
@@ -314,7 +317,10 @@ class AdbDevice(object):
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = subprocess.list2cmdline(cmdargs)
-        return self._client.shell(self._serial, cmdargs)
+        output = self._client.shell(self._serial, cmdargs)
+        if rstrip:
+            output = output.rstrip()
+        return output
 
     @deprecated(
         deprecated_in="0.2.4",

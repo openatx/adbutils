@@ -81,21 +81,53 @@ def main():
 
     parser.add_argument("-s", "--serial", help="device serial number")
     parser.add_argument(
+        "-V",
+        "--server-version",
+        action="store_true",
+        help="show adb server version")
+    parser.add_argument(
+        "-l", "--list", action="store_true", help="list devices")
+    parser.add_argument(
         "-i", "--install", help="install from local apk or url")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
     parser.add_argument(
         "--clear", action="store_true", help="clear all data when uninstall")
     parser.add_argument(
-        "-l", "--list", action="store_true", help="list packages installed")
+        "--list-packages", action="store_true", help="list packages installed")
     parser.add_argument("--grep", help="filter matched package names")
     parser.add_argument("--connect", type=str, help="connect remote device")
+    parser.add_argument(
+        "--shell", action="store_true", help="run shell command")
+    parser.add_argument("args", nargs="*", help="arguments")
+
     args = parser.parse_args()
 
     if args.connect:
         adbclient.connect(args.connect)
         return
-        
+
+    if args.server_version:
+        print("ADB Server version: {}".format(adbclient.server_version()))
+        return
+
+    if args.list:
+        rows = []
+        for d in adbclient.devices():
+            rows.append([d.serial, d.shell("getprop ro.product.model")])
+        lens = []
+        for col in zip(*rows):
+            lens.append(max([len(v) for v in col]))
+        format = "  ".join(["{:<" + str(l) + "}" for l in lens])
+        for row in rows:
+            print(format.format(*row))
+        return
+
     d = adbclient.device_with_serial(args.serial)
+
+    if args.shell:
+        output = d.shell(args.args)
+        print(output)
+        return
 
     if args.install:
         dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
@@ -136,7 +168,7 @@ def main():
     elif args.uninstall:
         d.shell_output("pm", "uninstall", args.uninstall)
 
-    elif args.list:
+    elif args.list_packages:
         patten = re.compile(args.grep or ".*")
         for p in d.list_packages():
             if patten.search(p):
