@@ -38,6 +38,15 @@ d = adb.device()
 
 The following code will not write `from adbutils import adb` for short
 
+## Connect remote device
+Same as command `adb connect`
+
+```python
+output = adb.connect("127.0.0.1:5555")
+print(output)
+# output: already connected to 127.0.0.1:5555
+```
+
 ## List forward
 Same as `adb forward --list`
 

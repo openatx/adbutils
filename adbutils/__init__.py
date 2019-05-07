@@ -160,7 +160,21 @@ class AdbClient(object):
             c.check_okay()
             return int(c.read_string(), 16)
 
-    def shell(self, serial, command) -> str:
+    def connect(self, addr: str) -> str:
+        """ adb connect $addr
+        Returns:
+            content adb server returns
+        
+        Example returns:
+            - "already connected to 192.168.190.101:5555"
+            - "unable to connect to 192.168.190.101:5551"
+        """
+        with self._connect() as c:
+            c.send("host:connect:" + addr)
+            c.check_okay()
+            return c.read_string()
+
+    def shell(self, serial, command: Union[str, list, tuple]) -> str:
         """Run shell in android and return output
         Args:
             serial (str)
