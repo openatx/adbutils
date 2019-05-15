@@ -120,6 +120,23 @@ com.github.uiautomator
 
 For more usage, please see the code for details. (Sorry I'm too lazy.)
 
+## Extra Functions
+
+AdbUtils provided some custom functions for some complex operations.
+
+You can use it like this:
+
+```python
+import adbutils
+
+adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
+device = adb.device()
+
+print(device.ext.show_package())
+```
+
+For further usage, please read [extras.py](adbutils/extras.py) for details.
+
 ## Develop
 ```sh
 git clone https://github.com/openatx/adbutils adbutils
