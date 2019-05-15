@@ -20,6 +20,8 @@ import six
 import whichcraft
 from deprecation import deprecated
 
+from adbutils.extras import ExtraUtils
+
 _OKAY = "OKAY"
 _FAIL = "FAIL"
 _DENT = "DENT"  # Directory Entity
@@ -280,6 +282,9 @@ class AdbDevice(object):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
+
+        # enable extra utils
+        self.ext = ExtraUtils(self)
 
     @property
     def serial(self):
