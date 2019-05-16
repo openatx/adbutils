@@ -132,7 +132,7 @@ import adbutils
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
 device = adb.device()
 
-print(device.ext.show_package())
+print(device.show_package())
 ```
 
 For further usage, please read [extras.py](adbutils/extras.py) for details.
