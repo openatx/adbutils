@@ -1,25 +1,17 @@
 import typing
 import re
-import weakref
-
-if typing.TYPE_CHECKING:
-    from adbutils import AdbDevice
 
 
-class ExtraUtils(object):
+class ExtraUtilsMixin(object):
     """ provide custom functions for some complex operations """
-
-    def __init__(self, device: 'AdbDevice'):
-        self._device = weakref.proxy(device)
-
     def _execute(self, command) -> str:
-        return self._device.shell(command)
+        return self.shell(command)
 
     def _show_all_functions(self) -> list:
         return [_ for _ in self.__dir__() if not _.startswith('_')]
 
     def say_hello(self) -> str:
-        content = 'hello from {}'.format(self._device.serial)
+        content = 'hello from {}'.format(self.serial)
         return self._execute('echo {}'.format(content))
 
     def input_key_event(self, key_code: (int, str)) -> str:

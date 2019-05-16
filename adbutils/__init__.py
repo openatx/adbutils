@@ -20,7 +20,7 @@ import six
 import whichcraft
 from deprecation import deprecated
 
-from adbutils.extras import ExtraUtils
+from adbutils.extras import ExtraUtilsMixin
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -278,13 +278,10 @@ class AdbClient(object):
         return Sync(self, serial)
 
 
-class AdbDevice(object):
+class AdbDevice(ExtraUtilsMixin):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
-
-        # enable extra utils
-        self.ext = ExtraUtils(self)
 
     @property
     def serial(self):
