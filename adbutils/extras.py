@@ -2,7 +2,7 @@ import typing
 import re
 import time
 
-from adbutils import AdbInstallError
+import adbutils
 
 
 class ExtraUtilsMixin(object):
@@ -187,7 +187,7 @@ class ExtraUtilsMixin(object):
         args = ["pm", "install"] + flags + [remote_path]
         output = self.shell_output(*args)
         if "Success" not in output:
-            raise AdbInstallError(output)
+            raise adbutils.AdbInstallError(output)
         if clean:
             self.shell_output("rm", remote_path)
 
