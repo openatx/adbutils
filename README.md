@@ -9,7 +9,7 @@ Python adb library for adb service (Only support Python3.6+)
 pip install adbutils
 ```
 
-# Usgae
+# Usage
 Example
 
 ## Connect ADB Server
@@ -22,7 +22,7 @@ print(adb.devices())
 
 The above code can be short to `from adbutils import adb`
 
-## List all the device and get device object
+## List all the devices and get device object
 ```python
 from adbutils import adb
 
