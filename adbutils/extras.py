@@ -7,6 +7,7 @@ import adbutils
 
 class ExtraUtilsMixin(object):
     """ provide custom functions for some complex operations """
+
     def _execute(self, command) -> str:
         return self.shell(command)
 
@@ -20,10 +21,6 @@ class ExtraUtilsMixin(object):
     def input_key_event(self, key_code: (int, str)) -> str:
         """ adb shell input keyevent KEY_CODE """
         return self._execute('input keyevent {}'.format(str(key_code)))
-
-    def show_package(self) -> str:
-        """ 展示设备上所有已安装的包 """
-        return self._execute('pm list package')
 
     def clean_cache(self, package_name: str) -> str:
         """

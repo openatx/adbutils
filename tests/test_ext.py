@@ -20,10 +20,6 @@ def test_input_key_event():
     target_device.input_key_event(4)
 
 
-def test_show_package():
-    assert target_device.show_package(), 'show package is empty'
-
-
 def test_clean_cache():
     # TODO 需要root，且需要一个用过的app的包名
     pass
