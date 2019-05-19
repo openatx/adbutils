@@ -17,7 +17,7 @@ def test_say_hello():
 
 def test_input_key_event():
     # make sure no error raised
-    target_device.input_key_event(4)
+    target_device.input_keyevent(4)
 
 
 def test_clean_cache():

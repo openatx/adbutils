@@ -1,6 +1,7 @@
-import typing
+# coding: utf-8
 import re
 import time
+import typing
 
 import adbutils
 
@@ -18,41 +19,29 @@ class ExtraUtilsMixin(object):
         content = 'hello from {}'.format(self.serial)
         return self._execute('echo {}'.format(content))
 
-    def input_key_event(self, key_code: (int, str)) -> str:
-        """ adb shell input keyevent KEY_CODE """
-        return self._execute('input keyevent {}'.format(str(key_code)))
-
-    def clean_cache(self, package_name: str) -> str:
+    def switch_screen(self, status: bool):
         """
-        清理对应包的缓存（需要root）
+        turn screen on/off
 
-        :param package_name: 对应包名
-        :return:
-        """
-        return self._execute('pm clear {}'.format(package_name))
-
-    def switch_screen(self, status: bool) -> str:
-        """
-        点亮/熄灭 屏幕
-
-        :param status: true or false
-        :return:
+        Args:
+            status (bool)
         """
         _key_dict = {
             True: '224',
             False: '223',
         }
-        return self.input_key_event(_key_dict[status])
+        return self.input_keyevent(_key_dict[status])
 
-    def switch_airplane(self, status: bool) -> str:
+    def switch_airplane(self, status: bool):
         """
-        切换飞行模式的开关
+        turn flight-mode on/off
 
-        :param status: true or false
-        :return:
+        Args:
+            status (bool)
         """
         base_setting_cmd = ["settings", "put", "global", "airplane_mode_on"]
-        base_am_cmd = ["am", "broadcast", "-a", "android.intent.action.AIRPLANE_MODE", "--ez", "state"]
+        base_am_cmd = ["am", "broadcast", "-a",
+                       "android.intent.action.AIRPLANE_MODE", "--ez", "state"]
         if status:
             base_setting_cmd += ['1']
             base_am_cmd += ['true']
@@ -66,10 +55,10 @@ class ExtraUtilsMixin(object):
 
     def switch_wifi(self, status: bool) -> str:
         """
-        切换wifi开关
+        turn WiFi on/off
 
-        :param status: true or false
-        :return:
+        Args:
+            status (bool)
         """
         base_cmd = ['svc', 'wifi']
         cmd_dict = {
@@ -78,77 +67,40 @@ class ExtraUtilsMixin(object):
         }
         return self._execute(cmd_dict[status])
 
-    def start_activity(self, command: str) -> str:
-        """
-        实际上是运行 adb shell am start <command>
+    def keyevent(self, key_code: (int, str)) -> str:
+        """ adb shell input keyevent KEY_CODE """
+        return self._execute('input keyevent {}'.format(str(key_code)))
 
-        :param command: adb shell am start <command>
-        :return:
-        """
-        return self._execute('am start {}'.format(command))
-
-    def start_broadcast(self, command: str) -> str:
-        """
-        实际上是运行 adb shell am broadcast <command>
-
-        :param command: adb shell am start <command>
-        :return:
-        """
-        return self._execute('am broadcast {}'.format(command))
-
-    def swipe(self, start: typing.Sequence, end: typing.Sequence) -> str:
+    def swipe(self, sx, sy, ex, ey):
         """
         swipe from start point to end point
 
-        :param start: (100, 100)
-        :param end: (400, 400)
-        :return:
+        Args:
+            sx, sy: start point(x, y)
+            ex, ey: end point(x, y)
         """
-        x1, y1, x2, y2 = map(str, [*start, *end])
+        x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         return self._execute(['input', 'swipe', x1, y1, x2, y2])
 
-    def click(self, point: typing.Sequence) -> str:
+    def click(self, x, y):
         """
-        adb shell input tap
+        simulate android tap
 
-        :param point: (100, 100)
-        :return:
+        Args:
+            x, y: int
         """
-        x, y = map(str, point)
+        x, y = map(str, [x, y])
         return self._execute(['input', 'tap', x, y])
 
-    def set_ime(self, ime_name: str) -> str:
+    def wlan_ip(self) -> str:
         """
-        设置输入法（可以使用adb shell ime list -a 获取输入法包名）
+        get device wlan ip
 
-        :param ime_name: 输入法包名 eg：com.android.inputmethod.pinyin/.PinyinIME
-        :return:
+        Raises:
+            IndexError
         """
-        return self._execute(['ime', 'set', ime_name])
-
-    def make_dir(self, target: str) -> str:
-        """
-        make empty dir: adb shell mkdir <target_dir>
-
-        :param target: 目标路径，/sdcard/somewhere
-        :return:
-        """
-        return self._execute(['mkdir', target])
-
-    def remove_dir(self, target: str) -> str:
-        """
-        clean dir: adb shell rm -rf <target>
-
-        :param target: 目标路径，/sdcard/somewhere
-        :return:
-        """
-        return self._execute(['rm', '-rf', target])
-
-    def get_ip_address(self) -> str:
-        """ 获取android设备ip """
         # TODO better design?
         result = self._execute(['ifconfig', 'wlan0'])
-        print(result)
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
     def install(self, apk_path: str):
@@ -162,13 +114,6 @@ class ExtraUtilsMixin(object):
         dst = "/data/local/tmp/tmp-{}.apk".format(int(time.time() * 1000))
         self.sync.push(apk_path, dst)
         self.install_remote(dst, clean=True)
-        # try:
-        #     output = self.shell_output("pm", "install", "-r", "-t", dst)
-        #     if "Success" not in output:
-        #         raise AdbError(output)
-        # finally:
-        #     self.shell_output("rm", dst)
-        # self.adb_output("install", "-r", apk_path)
 
     def install_remote(self,
                        remote_path: str,
@@ -176,7 +121,7 @@ class ExtraUtilsMixin(object):
                        flags: list = ["-r", "-t"]):
         """
         Args:
-            clean(bool): remove when installed
+            clean(bool): remove when installed, default(False)
 
         Raises:
             AdbInstallError
@@ -189,8 +134,13 @@ class ExtraUtilsMixin(object):
             self.shell_output("rm", remote_path)
 
     def uninstall(self, pkg_name: str):
+        """
+        Uninstall app by package name
+
+        Args:
+            pkg_name (str): package name
+        """
         return self.shell_output("pm", "uninstall", pkg_name)
-        # self.adb_output("uninstall", pkg_name)
 
     def getprop(self, prop: str) -> str:
         return self.shell_output('getprop', prop).strip()
@@ -211,7 +161,7 @@ class ExtraUtilsMixin(object):
         version_code might be empty
 
         Returns:
-            None or dict
+            None or dict(version_name, version_code, signature)
         """
         output = self.shell_output('dumpsys', 'package', pkg_name)
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
@@ -230,7 +180,9 @@ class ExtraUtilsMixin(object):
             signature=signature)
 
     def window_size(self):
-        """get window size
+        """
+        Get window size
+
         Returns:
             (width, height)
         """
@@ -243,3 +195,51 @@ class ExtraUtilsMixin(object):
     def app_start(self, package_name: str):
         self.shell_output("monkey", "-p", package_name, "-c",
                           "android.intent.category.LAUNCHER", "1")
+
+    def app_clear(self, package_name: str):
+        self.shell_output("pm", "clear", package_name)
+
+    # def start_activity(self, command: str) -> str:
+    #     """
+    #     实际上是运行 adb shell am start <command>
+
+    #     :param command: adb shell am start <command>
+    #     :return:
+    #     """
+    #     return self._execute('am start {}'.format(command))
+
+    # def start_broadcast(self, command: str) -> str:
+    #     """
+    #     实际上是运行 adb shell am broadcast <command>
+
+    #     :param command: adb shell am start <command>
+    #     :return:
+    #     """
+    #     return self._execute('am broadcast {}'.format(command))
+
+    # def make_dir(self, target: str) -> str:
+    #     """
+    #     make empty dir: adb shell mkdir <target_dir>
+
+    #     :param target: 目标路径，/sdcard/somewhere
+    #     :return:
+    #     """
+    #     return self._execute(['mkdir', target])
+
+    # def remove_dir(self, target: str) -> str:
+    #     """
+    #     clean dir: adb shell rm -rf <target>
+
+    #     :param target: 目标路径，/sdcard/somewhere
+    #     :return:
+    #     """
+    #     return self._execute(['rm', '-rf', target])
+
+    # def set_ime(self, ime_name: str) -> str:
+    #     """
+    #     设置输入法（可以使用adb shell ime list -a 获取输入法包名）
+
+    #     :param ime_name: 输入法包名 eg：com.android.inputmethod.pinyin/.PinyinIME
+    #     :return:
+    #     """
+    #     return self._execute(['ime', 'set', ime_name])
