@@ -9,9 +9,12 @@ import adbutils
 class ExtraUtilsMixin(object):
     """ provide custom functions for some complex operations """
 
+    def _execute(self, *args) -> str:
+        return self.shell(args)
+
     def say_hello(self) -> str:
         content = 'hello from {}'.format(self.serial)
-        return self.shell('echo {}'.format(content))
+        return self._execute('echo {}'.format(content))
 
     def switch_screen(self, status: bool):
         """
@@ -46,8 +49,8 @@ class ExtraUtilsMixin(object):
             base_am_cmd += ['false']
 
         # TODO better idea about return value?
-        self.shell(base_setting_cmd)
-        return self.shell(base_am_cmd)
+        self._execute(base_setting_cmd)
+        return self._execute(base_am_cmd)
 
     def switch_wifi(self, status: bool) -> str:
         """
@@ -61,11 +64,11 @@ class ExtraUtilsMixin(object):
             True: base_cmd + ['enable'],
             False: base_cmd + ['disable'],
         }
-        return self.shell(cmd_dict[status])
+        return self._execute(cmd_dict[status])
 
     def keyevent(self, key_code: (int, str)) -> str:
-        """ adb shell input keyevent KEY_CODE """
-        return self.shell('input keyevent {}'.format(str(key_code)))
+        """ adb _execute input keyevent KEY_CODE """
+        return self._execute('input keyevent {}'.format(str(key_code)))
 
     def swipe(self, sx, sy, ex, ey):
         """
@@ -76,7 +79,7 @@ class ExtraUtilsMixin(object):
             ex, ey: end point(x, y)
         """
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
-        return self.shell(['input', 'swipe', x1, y1, x2, y2])
+        return self._execute(['input', 'swipe', x1, y1, x2, y2])
 
     def click(self, x, y):
         """
@@ -86,7 +89,7 @@ class ExtraUtilsMixin(object):
             x, y: int
         """
         x, y = map(str, [x, y])
-        return self.shell(['input', 'tap', x, y])
+        return self._execute(['input', 'tap', x, y])
 
     def wlan_ip(self) -> str:
         """
@@ -96,7 +99,7 @@ class ExtraUtilsMixin(object):
             IndexError
         """
         # TODO better design?
-        result = self.shell(['ifconfig', 'wlan0'])
+        result = self._execute(['ifconfig', 'wlan0'])
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
     def install(self, apk_path: str):
@@ -125,11 +128,11 @@ class ExtraUtilsMixin(object):
             AdbInstallError
         """
         args = ["pm", "install"] + flags + [remote_path]
-        output = self.shell(*args)
+        output = self._execute(*args)
         if "Success" not in output:
             raise adbutils.AdbInstallError(output)
         if clean:
-            self.shell("rm", remote_path)
+            self._execute("rm", remote_path)
 
     def uninstall(self, pkg_name: str):
         """
@@ -138,10 +141,10 @@ class ExtraUtilsMixin(object):
         Args:
             pkg_name (str): package name
         """
-        return self.shell("pm", "uninstall", pkg_name)
+        return self._execute("pm", "uninstall", pkg_name)
 
     def getprop(self, prop: str) -> str:
-        return self.shell('getprop', prop).strip()
+        return self._execute('getprop', prop).strip()
 
     def list_packages(self) -> list:
         """
@@ -149,7 +152,7 @@ class ExtraUtilsMixin(object):
             list of package names
         """
         result = []
-        output = self.shell("pm", "list", "packages", "-3")
+        output = self._execute("pm", "list", "packages", "-3")
         for m in re.finditer(r'^package:([^\s]+)$', output, re.M):
             result.append(m.group(1))
         return list(sorted(result))
@@ -161,7 +164,7 @@ class ExtraUtilsMixin(object):
         Returns:
             None or dict(version_name, version_code, signature)
         """
-        output = self.shell('dumpsys', 'package', pkg_name)
+        output = self._execute('dumpsys', 'package', pkg_name)
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
         version_name = m.group('name') if m else ""
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
@@ -183,15 +186,15 @@ class ExtraUtilsMixin(object):
         Returns:
             (width, height)
         """
-        output = self.shell("wm", "size")
+        output = self._execute("wm", "size")
         m = re.match(r"Physical size: (\d+)x(\d+)", output)
         if m:
             return list(map(int, m.groups()))
         raise RuntimeError("Can't parse wm size: " + output)
 
     def app_start(self, package_name: str):
-        self.shell("monkey", "-p", package_name, "-c",
+        self._execute("monkey", "-p", package_name, "-c",
                           "android.intent.category.LAUNCHER", "1")
 
     def app_clear(self, package_name: str):
-        self.shell("pm", "clear", package_name)
+        self._execute("pm", "clear", package_name)
