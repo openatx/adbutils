@@ -10,7 +10,6 @@ import socket
 import stat
 import struct
 import subprocess
-import time
 from collections import namedtuple
 from contextlib import contextmanager
 from typing import Union
@@ -19,6 +18,8 @@ import pkg_resources
 import six
 import whichcraft
 from deprecation import deprecated
+
+from adbutils.mixin import ExtraUtilsMixin
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -276,7 +277,7 @@ class AdbClient(object):
         return Sync(self, serial)
 
 
-class AdbDevice(object):
+class AdbDevice(ExtraUtilsMixin):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
@@ -363,99 +364,6 @@ class AdbDevice(object):
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
-
-    def install(self, apk_path: str):
-        """
-        sdk = self.getprop('ro.build.version.sdk')
-        sdk > 23 support -g
-        
-        Raises:
-            AdbInstallError
-        """
-        dst = "/data/local/tmp/tmp-{}.apk".format(int(time.time() * 1000))
-        self.sync.push(apk_path, dst)
-        self.install_remote(dst, clean=True)
-        # try:
-        #     output = self.shell_output("pm", "install", "-r", "-t", dst)
-        #     if "Success" not in output:
-        #         raise AdbError(output)
-        # finally:
-        #     self.shell_output("rm", dst)
-        # self.adb_output("install", "-r", apk_path)
-
-    def install_remote(self,
-                       remote_path: str,
-                       clean: bool = False,
-                       flags: list = ["-r", "-t"]):
-        """
-        Args:
-            clean(bool): remove when installed
-
-        Raises:
-            AdbInstallError
-        """
-        args = ["pm", "install"] + flags + [remote_path]
-        output = self.shell_output(*args)
-        if "Success" not in output:
-            raise AdbInstallError(output)
-        if clean:
-            self.shell_output("rm", remote_path)
-
-    def uninstall(self, pkg_name: str):
-        return self.shell_output("pm", "uninstall", pkg_name)
-        # self.adb_output("uninstall", pkg_name)
-
-    def getprop(self, prop: str) -> str:
-        return self.shell_output('getprop', prop).strip()
-
-    def list_packages(self) -> list:
-        """
-        Returns:
-            list of package names
-        """
-        result = []
-        output = self.shell_output("pm", "list", "packages", "-3")
-        for m in re.finditer(r'^package:([^\s]+)$', output, re.M):
-            result.append(m.group(1))
-        return list(sorted(result))
-
-    def package_info(self, pkg_name: str) -> Union[dict, None]:
-        """
-        version_code might be empty
-
-        Returns:
-            None or dict
-        """
-        output = self.shell_output('dumpsys', 'package', pkg_name)
-        m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
-        version_name = m.group('name') if m else ""
-        m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
-        version_code = m.group('code') if m else ""
-        if version_code == "0":
-            version_code = ""
-        m = re.search(r'PackageSignatures\{(.*?)\}', output)
-        signature = m.group(1) if m else None
-        if not version_name and signature is None:
-            return None
-        return dict(
-            version_name=version_name,
-            version_code=version_code,
-            signature=signature)
-
-    def window_size(self):
-        """get window size
-        Returns:
-            (width, height)
-        """
-        output = self.shell_output("wm", "size")
-        m = re.match(r"Physical size: (\d+)x(\d+)", output)
-        if m:
-            return list(map(int, m.groups()))
-        raise RuntimeError("Can't parse wm size: " + output)
-
-    def app_start(self, package_name: str):
-        self.shell_output("monkey", "-p", package_name, "-c",
-                          "android.intent.category.LAUNCHER", "1")
 
 
 class Sync():

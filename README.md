@@ -9,7 +9,7 @@ Python adb library for adb service (Only support Python3.6+)
 pip install adbutils
 ```
 
-# Usgae
+# Usage
 Example
 
 ## Connect ADB Server
@@ -22,7 +22,7 @@ print(adb.devices())
 
 The above code can be short to `from adbutils import adb`
 
-## List all the device and get device object
+## List all the devices and get device object
 ```python
 from adbutils import adb
 
@@ -120,6 +120,23 @@ com.github.uiautomator
 
 For more usage, please see the code for details. (Sorry I'm too lazy.)
 
+## Extra Functions
+
+AdbUtils provided some custom functions for some complex operations.
+
+You can use it like this:
+
+```python
+import adbutils
+
+adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
+device = adb.device()
+
+print(device.show_package())
+```
+
+For further usage, please read [extras.py](adbutils/extras.py) for details.
+
 ## Develop
 ```sh
 git clone https://github.com/openatx/adbutils adbutils
@@ -148,6 +165,7 @@ pytest tests/
 - [openstf/adbkit](https://github.com/openstf/adbkit)
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
 - ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
+- [Awesome ADB](https://github.com/mzlogin/awesome-adb)
 
 # LICENSE
 [MIT](LICENSE)
