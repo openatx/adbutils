@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import datetime
+import json
 import os
 import re
 import socket
@@ -26,9 +27,14 @@ _FAIL = "FAIL"
 _DENT = "DENT"  # Directory Entity
 _DONE = "DONE"
 
+_DISPLAY_RE = re.compile(
+    r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
+)
+
 DeviceItem = namedtuple("Device", ["serial", "status"])
 ForwardItem = namedtuple("ForwardItem", ["serial", "local", "remote"])
 FileInfo = namedtuple("FileInfo", ['mode', 'size', 'mtime', 'name'])
+WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
 try:
     __version__ = pkg_resources.get_distribution("adbutils").version
@@ -258,11 +264,10 @@ class AdbClient(object):
             )
         return ds[0]
 
-    @deprecated(
-        deprecated_in="0.2.1",
-        removed_in="0.3.0",
-        current_version=__version__,
-        details="use device(serial=serial) instead")
+    @deprecated(deprecated_in="0.2.1",
+                removed_in="0.3.0",
+                current_version=__version__,
+                details="use device(serial=serial) instead")
     def device_with_serial(self, serial=None) -> 'AdbDevice':
         if not serial:
             return self.must_one_device()
@@ -308,8 +313,9 @@ class AdbDevice(ExtraUtilsMixin):
         cmds.extend(args)
         cmdline = subprocess.list2cmdline(map(str, cmds))
         try:
-            return subprocess.check_output(
-                cmdline, stderr=subprocess.STDOUT, shell=True).decode('utf-8')
+            return subprocess.check_output(cmdline,
+                                           stderr=subprocess.STDOUT,
+                                           shell=True).decode('utf-8')
         except subprocess.CalledProcessError as e:
             if kwargs.get('raise_error', True):
                 raise EnvironmentError(
@@ -337,11 +343,10 @@ class AdbDevice(ExtraUtilsMixin):
             output = output.rstrip()
         return output
 
-    @deprecated(
-        deprecated_in="0.2.4",
-        removed_in="0.3.0",
-        current_version=__version__,
-        details="use shell function instead, eg shell(\"ls -l\")")
+    @deprecated(deprecated_in="0.2.4",
+                removed_in="0.3.0",
+                current_version=__version__,
+                details="use shell function instead, eg shell(\"ls -l\")")
     def shell_output(self, *args) -> str:
         return self._client.shell(self._serial, subprocess.list2cmdline(args))
 
@@ -370,7 +375,6 @@ class Sync():
     def __init__(self, adbclient: AdbClient, serial: str):
         self._adbclient = adbclient
         self._serial = serial
-        # self._path = path
 
     @contextmanager
     def _prepare_sync(self, path, cmd):
@@ -480,9 +484,8 @@ if __name__ == "__main__":
     import io
     sync = adb.sync(d.serial)
     filepath = "/data/local/tmp/hi.txt"
-    sync.push(
-        io.BytesIO(b"hi5a4de5f4qa6we541fq6w1ef5a61f65ew1rf6we"), filepath,
-        0o644)
+    sync.push(io.BytesIO(b"hi5a4de5f4qa6we541fq6w1ef5a61f65ew1rf6we"),
+              filepath, 0o644)
 
     print("FileInfo", sync.stat(filepath))
     for chunk in sync.iter_content(filepath):

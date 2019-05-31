@@ -1,20 +1,28 @@
 # coding: utf-8
+import json
 import re
 import time
 import typing
+from collections import namedtuple
 
 import adbutils
+
+_DISPLAY_RE = re.compile(
+    r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
+)
+
+WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
 
 class ExtraUtilsMixin(object):
     """ provide custom functions for some complex operations """
 
-    def _execute(self, *args) -> str:
-        return self.shell(args)
+    def _run(self, *args) -> str:
+        return self.shell(*args)
 
     def say_hello(self) -> str:
         content = 'hello from {}'.format(self.serial)
-        return self._execute('echo {}'.format(content))
+        return self._run(['echo', content])
 
     def switch_screen(self, status: bool):
         """
@@ -49,8 +57,8 @@ class ExtraUtilsMixin(object):
             base_am_cmd += ['false']
 
         # TODO better idea about return value?
-        self._execute(base_setting_cmd)
-        return self._execute(base_am_cmd)
+        self._run(base_setting_cmd)
+        return self._run(base_am_cmd)
 
     def switch_wifi(self, status: bool) -> str:
         """
@@ -64,22 +72,11 @@ class ExtraUtilsMixin(object):
             True: base_cmd + ['enable'],
             False: base_cmd + ['disable'],
         }
-        return self._execute(cmd_dict[status])
+        return self._run(cmd_dict[status])
 
     def keyevent(self, key_code: (int, str)) -> str:
-        """ adb _execute input keyevent KEY_CODE """
-        return self._execute('input keyevent {}'.format(str(key_code)))
-
-    def swipe(self, sx, sy, ex, ey):
-        """
-        swipe from start point to end point
-
-        Args:
-            sx, sy: start point(x, y)
-            ex, ey: end point(x, y)
-        """
-        x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
-        return self._execute(['input', 'swipe', x1, y1, x2, y2])
+        """ adb _run input keyevent KEY_CODE """
+        return self._run(['input', 'keyevent', str(key_code)])
 
     def click(self, x, y):
         """
@@ -89,7 +86,20 @@ class ExtraUtilsMixin(object):
             x, y: int
         """
         x, y = map(str, [x, y])
-        return self._execute(['input', 'tap', x, y])
+        return self._run(['input', 'tap', x, y])
+
+    def swipe(self, sx, sy, ex, ey, duration: float = 1.0):
+        """
+        swipe from start point to end point
+
+        Args:
+            sx, sy: start point(x, y)
+            ex, ey: end point(x, y)
+        """
+        x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
+        return self._run(
+            ['input', 'swipe', x1, y1, x2, y2,
+             int(duration * 1000)])
 
     def wlan_ip(self) -> str:
         """
@@ -99,7 +109,7 @@ class ExtraUtilsMixin(object):
             IndexError
         """
         # TODO better design?
-        result = self._execute(['ifconfig', 'wlan0'])
+        result = self._run(['ifconfig', 'wlan0'])
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
     def install(self, apk_path: str):
@@ -128,11 +138,11 @@ class ExtraUtilsMixin(object):
             AdbInstallError
         """
         args = ["pm", "install"] + flags + [remote_path]
-        output = self._execute(*args)
+        output = self._run(*args)
         if "Success" not in output:
             raise adbutils.AdbInstallError(output)
         if clean:
-            self._execute("rm", remote_path)
+            self._run("rm", remote_path)
 
     def uninstall(self, pkg_name: str):
         """
@@ -141,10 +151,10 @@ class ExtraUtilsMixin(object):
         Args:
             pkg_name (str): package name
         """
-        return self._execute("pm", "uninstall", pkg_name)
+        return self._run("pm", "uninstall", pkg_name)
 
     def getprop(self, prop: str) -> str:
-        return self._execute('getprop', prop).strip()
+        return self._run(['getprop', prop]).strip()
 
     def list_packages(self) -> list:
         """
@@ -152,7 +162,7 @@ class ExtraUtilsMixin(object):
             list of package names
         """
         result = []
-        output = self._execute("pm", "list", "packages", "-3")
+        output = self._run(["pm", "list", "packages", "-3"])
         for m in re.finditer(r'^package:([^\s]+)$', output, re.M):
             result.append(m.group(1))
         return list(sorted(result))
@@ -164,7 +174,7 @@ class ExtraUtilsMixin(object):
         Returns:
             None or dict(version_name, version_code, signature)
         """
-        output = self._execute('dumpsys', 'package', pkg_name)
+        output = self._run(['dumpsys', 'package', pkg_name])
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
         version_name = m.group('name') if m else ""
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
@@ -179,22 +189,71 @@ class ExtraUtilsMixin(object):
                     version_code=version_code,
                     signature=signature)
 
-    def window_size(self):
-        """
-        Get window size
+    def rotation(self) -> int:
+        for line in self.shell('dumpsys display').splitlines():
+            m = _DISPLAY_RE.search(line, 0)
+            if not m:
+                continue
+            o = int(m.group('orientation'))
+            return int(o)
 
-        Returns:
-            (width, height)
-        """
-        output = self._execute("wm", "size")
-        m = re.match(r"Physical size: (\d+)x(\d+)", output)
+        output = self.shell(
+            'LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/minicap -i')
+        try:
+            data = json.loads(output)
+            return data['rotation'] / 90
+        except ValueError:
+            pass
+
+        raise adbutils.AdbError("rotation get failed")
+
+    def _raw_window_size(self) -> WindowSize:
+        output = self.shell("wm size")
+        m = re.search(r"Physical size: (\d+)x(\d+)", output)
         if m:
-            return list(map(int, m.groups()))
-        raise RuntimeError("Can't parse wm size: " + output)
+            w, h = m.group(1), m.group(2)
+            return WindowSize(int(w), int(h))
 
-    def app_start(self, package_name: str):
-        self._execute("monkey", "-p", package_name, "-c",
-                          "android.intent.category.LAUNCHER", "1")
+        for line in self.shell('dumpsys display').splitlines():
+            m = _DISPLAY_RE.search(line, 0)
+            if not m:
+                continue
+            w = int(m.group('width'))
+            h = int(m.group('height'))
+            return WindowSize(w, h)
+        raise adbutils.AdbError("get window size failed")
+
+    def window_size(self) -> WindowSize:
+        """
+        Return screen (width, height)
+
+        Virtual keyborad may get small d.info['displayHeight']
+        """
+        w, h = self._raw_window_size()
+        s, l = min(w, h), max(w, h)
+        horizontal = self.rotation() % 2 == 1
+        return WindowSize(l, s) if horizontal else WindowSize(s, l)
+
+    def app_start(self, package_name: str, activity: str = None):
+        if activity:
+            self._run(['am', 'start', '-n', package_name + "/" + activity])
+        else:
+            self._run([
+                "monkey", "-p", package_name, "-c",
+                "android.intent.category.LAUNCHER", "1"
+            ])
 
     def app_clear(self, package_name: str):
-        self._execute("pm", "clear", package_name)
+        self._run(["pm", "clear", package_name])
+
+    def dump_hierarchy(self):
+        """ uiautomator dump """
+        output = self._run(
+            'uiautomator dump /data/local/tmp/uidump.xml && echo success')
+        if "success" not in output:
+            raise RuntimeError("uiautomator dump failed")
+
+        buf = b''
+        for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
+            buf += chunk
+        return buf.decode("utf-8")

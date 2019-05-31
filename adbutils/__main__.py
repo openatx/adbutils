@@ -157,7 +157,7 @@ def main():
         print("Success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
-        d.shell_output("mv", dst, new_dst)
+        d.shell(["mv", dst, new_dst])
         dst = new_dst
         info = d.sync.stat(dst)
         print("verify pushed apk, md5: %s, size: %s" %
@@ -177,7 +177,7 @@ def main():
                 "adb shell pm install -r -t " + dst)
 
     elif args.uninstall:
-        d.shell_output("pm", "uninstall", args.uninstall)
+        d.shell(["pm", "uninstall", args.uninstall])
 
     elif args.list_packages:
         patten = re.compile(args.grep or ".*")
@@ -225,23 +225,24 @@ def main():
         print("sdk: %s, abi: %s, support-abis: %s" %
               (sdk, abi, ','.join(abis)))
         print("Push minicap+minicap.so to device")
-        prefix = zip_folder+"/node_modules/minicap-prebuilt/prebuilt/"
+        prefix = zip_folder + "/node_modules/minicap-prebuilt/prebuilt/"
         push_zipfile(prefix + abi + "/lib/android-" + sdk + "/minicap.so",
                      "/data/local/tmp/minicap.so", 0o644, zipfile_path)
         push_zipfile(prefix + abi + "/bin/minicap", "/data/local/tmp/minicap",
                      0o0755, zipfile_path)
 
         print("Push minitouch to device")
-        prefix = zip_folder+"/node_modules/minitouch-prebuilt/prebuilt/"
+        prefix = zip_folder + "/node_modules/minitouch-prebuilt/prebuilt/"
         push_zipfile(prefix + abi + "/bin/minitouch",
                      "/data/local/tmp/minitouch", 0o0755, zipfile_path)
-        
+
         # check if minicap installed
         output = d.shell([
             "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"
         ])
         print(output)
-        print("If you see JSON output, it means minicap installed successfully")
+        print(
+            "If you see JSON output, it means minicap installed successfully")
 
 
 if __name__ == "__main__":

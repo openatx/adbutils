@@ -127,15 +127,31 @@ AdbUtils provided some custom functions for some complex operations.
 You can use it like this:
 
 ```python
-import adbutils
+# simulate click
+d.click(100, 100)
 
-adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
-device = adb.device()
+# swipe from(10, 10) to(200, 200) 500ms
+d.swipe(10, 10, 200, 200, 0.5)
 
-print(device.show_package())
+d.list_packages()
+# example output: ["com.example.hello"]
+
+d.window_size() 
+# example output: (1080, 1920)
+
+d.rotation()
+# example output: 1
+# other possible valus: 0, 1, 2, 3
+
+d.package_info("com.github.uiautomator")
+# example output: {"version_name": "1.1.7", "version_code": "1007"}
+
+d.keyevent("HOME")
+
+# There still too many functions, please see source codes
 ```
 
-For further usage, please read [extras.py](adbutils/extras.py) for details.
+For further usage, please read [mixin.py](adbutils/mixin.py) for details.
 
 ## Develop
 ```sh
