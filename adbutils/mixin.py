@@ -5,7 +5,8 @@ import time
 import typing
 from collections import namedtuple
 
-import adbutils
+from retry import retry
+from adbutils.errors import AdbError, AdbInstallError
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
@@ -17,8 +18,8 @@ WindowSize = namedtuple("WindowSize", ['width', 'height'])
 class ExtraUtilsMixin(object):
     """ provide custom functions for some complex operations """
 
-    def _run(self, *args) -> str:
-        return self.shell(*args)
+    def _run(self, cmd) -> str:
+        return self.shell(cmd)
 
     def say_hello(self) -> str:
         content = 'hello from {}'.format(self.serial)
@@ -99,7 +100,7 @@ class ExtraUtilsMixin(object):
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         return self._run(
             ['input', 'swipe', x1, y1, x2, y2,
-             int(duration * 1000)])
+             str(int(duration * 1000))])
 
     def wlan_ip(self) -> str:
         """
@@ -138,11 +139,11 @@ class ExtraUtilsMixin(object):
             AdbInstallError
         """
         args = ["pm", "install"] + flags + [remote_path]
-        output = self._run(*args)
+        output = self._run(args)
         if "Success" not in output:
-            raise adbutils.AdbInstallError(output)
+            raise AdbInstallError(output)
         if clean:
-            self._run("rm", remote_path)
+            self._run(["rm", remote_path])
 
     def uninstall(self, pkg_name: str):
         """
@@ -151,7 +152,7 @@ class ExtraUtilsMixin(object):
         Args:
             pkg_name (str): package name
         """
-        return self._run("pm", "uninstall", pkg_name)
+        return self._run(["pm", "uninstall", pkg_name])
 
     def getprop(self, prop: str) -> str:
         return self._run(['getprop', prop]).strip()
@@ -190,6 +191,10 @@ class ExtraUtilsMixin(object):
                     signature=signature)
 
     def rotation(self) -> int:
+        """
+        Returns:
+            int [0, 1, 2, 3]
+        """
         for line in self.shell('dumpsys display').splitlines():
             m = _DISPLAY_RE.search(line, 0)
             if not m:
@@ -205,7 +210,7 @@ class ExtraUtilsMixin(object):
         except ValueError:
             pass
 
-        raise adbutils.AdbError("rotation get failed")
+        raise AdbError("rotation get failed")
 
     def _raw_window_size(self) -> WindowSize:
         output = self.shell("wm size")
@@ -221,7 +226,7 @@ class ExtraUtilsMixin(object):
             w = int(m.group('width'))
             h = int(m.group('height'))
             return WindowSize(w, h)
-        raise adbutils.AdbError("get window size failed")
+        raise AdbError("get window size failed")
 
     def window_size(self) -> WindowSize:
         """
@@ -235,6 +240,8 @@ class ExtraUtilsMixin(object):
         return WindowSize(l, s) if horizontal else WindowSize(s, l)
 
     def app_start(self, package_name: str, activity: str = None):
+        """ start app with "am start" or "monkey"
+        """
         if activity:
             self._run(['am', 'start', '-n', package_name + "/" + activity])
         else:
@@ -247,7 +254,12 @@ class ExtraUtilsMixin(object):
         self._run(["pm", "clear", package_name])
 
     def dump_hierarchy(self):
-        """ uiautomator dump """
+        """
+        uiautomator dump
+        
+        Returns:
+            content of xml
+        """
         output = self._run(
             'uiautomator dump /data/local/tmp/uidump.xml && echo success')
         if "success" not in output:
@@ -257,3 +269,44 @@ class ExtraUtilsMixin(object):
         for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
             buf += chunk
         return buf.decode("utf-8")
+    
+    @retry(AdbError, delay=.5, tries=3, jitter=.1)
+    def current_app(self):
+        """
+        Returns:
+            dict(package, activity, pid?)
+
+        Raises:
+            AdbError
+        """
+        # Related issue: https://github.com/openatx/uiautomator2/issues/200
+        # $ adb shell dumpsys window windows
+        # Example output:
+        #   mCurrentFocus=Window{41b37570 u0 com.incall.apps.launcher/com.incall.apps.launcher.Launcher}
+        #   mFocusedApp=AppWindowToken{422df168 token=Token{422def98 ActivityRecord{422dee38 u0 com.example/.UI.play.PlayActivity t14}}}
+        # Regexp
+        #   r'mFocusedApp=.*ActivityRecord{\w+ \w+ (?P<package>.*)/(?P<activity>.*) .*'
+        #   r'mCurrentFocus=Window{\w+ \w+ (?P<package>.*)/(?P<activity>.*)\}')
+        _focusedRE = re.compile(
+            r'mCurrentFocus=Window{.*\s+(?P<package>[^\s]+)/(?P<activity>[^\s]+)\}'
+        )
+        m = _focusedRE.search(self._run(['dumpsys', 'window', 'windows']))
+        if m:
+            return dict(
+                package=m.group('package'), activity=m.group('activity'))
+
+        # try: adb shell dumpsys activity top
+        _activityRE = re.compile(
+            r'ACTIVITY (?P<package>[^\s]+)/(?P<activity>[^/\s]+) \w+ pid=(?P<pid>\d+)'
+        )
+        output = self._run(['dumpsys', 'activity', 'top'])
+        ms = _activityRE.finditer(output)
+        ret = None
+        for m in ms:
+            ret = dict(
+                package=m.group('package'),
+                activity=m.group('activity'),
+                pid=int(m.group('pid')))
+        if ret:  # get last result
+            return ret
+        raise AdbError("Couldn't get focused app")

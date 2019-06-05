@@ -55,3 +55,8 @@ def test_wlan_ip(device: AdbDevice):
     time.sleep(3)
     ip = device.wlan_ip()
     assert ip, 'ip is empty'
+
+def test_current_app(device: AdbDevice):
+    info = device.current_app()
+    assert 'package' in info
+    assert 'activity' in info
