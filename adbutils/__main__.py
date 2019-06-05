@@ -20,8 +20,8 @@ import zipfile
 
 import requests
 
-from adbutils import AdbError, AdbInstallError
 from adbutils import adb as adbclient
+from adbutils.errors import AdbError, AdbInstallError
 
 MB = 1024 * 1024
 
