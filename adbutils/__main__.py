@@ -108,6 +108,7 @@ def main():
     parser.add_argument("--minicap",
                         action="store_true",
                         help="install minicap and minitouch to device")
+    parser.add_argument("--screenshot", type=str, help="take screenshot")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -243,6 +244,12 @@ def main():
         print(output)
         print(
             "If you see JSON output, it means minicap installed successfully")
+    
+    if args.screenshot:
+        remote_tmp_path = "/data/local/tmp/screenshot.png"
+        d.shell(["rm", remote_tmp_path])
+        d.shell(["screencap", "-p", remote_tmp_path])
+        d.sync.pull(remote_tmp_path, args.screenshot)
 
 
 if __name__ == "__main__":

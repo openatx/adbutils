@@ -333,15 +333,16 @@ class AdbDevice(ExtraUtilsMixin):
     def forward(self, local: str, remote: str):
         return self._client.forward(self._serial, local, remote)
 
-    def forward_port(self, remote_port: int) -> int:
+    def forward_port(self, remote: Union[int, str]) -> int:
         """ forward remote port to local random port """
+        if isinstance(remote, int):
+            remote = "tcp:" + str(remote)
         for f in self._client.forward_list():
-            if f.serial == self._serial and f.remote == 'tcp:' + str(
-                    remote_port) and f.local.startswith("tcp:"):
+            if f.serial == self._serial and f.remote == remote and f.local.startswith(
+                    "tcp:"):
                 return int(f.local[len("tcp:"):])
         local_port = get_free_port()
-        self._client.forward(self._serial, "tcp:" + str(local_port),
-                             "tcp:" + str(remote_port))
+        self._client.forward(self._serial, "tcp:" + str(local_port), remote)
         return local_port
 
     def forward_list(self):
