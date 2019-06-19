@@ -55,8 +55,7 @@ def get_free_port():
 def adb_path():
     path = whichcraft.which("adb")
     if path is None:
-        raise EnvironmentError(
-            "Can't find the adb, please install adb on your PC")
+        raise EnvironmentError("Can't find adb, please install adb first")
     return path
 
 
@@ -68,13 +67,25 @@ class _AdbStreamConnection(object):
 
         self._connect()
 
-    def _connect(self):
+    def _create_socket(self):
         adb_host = self.__host or os.environ.get("ANDROID_ADB_SERVER_HOST",
                                                  "127.0.0.1")
         adb_port = self.__port or int(
             os.environ.get("ANDROID_ADB_SERVER_PORT", 5037))
-        s = self.__conn = socket.socket()
-        s.connect((adb_host, adb_port))
+        s = socket.socket()
+        try:
+            s.connect((adb_host, adb_port))
+            return s
+        except:
+            s.close()
+            raise
+
+    def _connect(self):
+        try:
+            self.__conn = self._create_socket()
+        except ConnectionRefusedError:
+            subprocess.run([adb_path(), "start-server"])
+            self.__conn = self._create_socket()
         return self
 
     def close(self):
@@ -231,31 +242,33 @@ class AdbClient(object):
                 if parts[1] == 'device':
                     yield AdbDevice(self, parts[0])
 
+    @deprecated(deprecated_in="0.3.0",
+                removed_in="0.4.0",
+                current_version=__version__,
+                details="use device_list() instead")
     def devices(self) -> list:
         return list(self.iter_device())
 
-    def must_one_device(self):
-        ds = self.devices()
-        if len(ds) == 0:
-            raise RuntimeError("Can't find any android device/emulator")
-        if len(ds) > 1:
-            raise RuntimeError(
-                "more than one device/emulator, please specify the serial number"
-            )
-        return ds[0]
+    def device_list(self):
+        return list(self.iter_device())
 
-    @deprecated(deprecated_in="0.2.1",
-                removed_in="0.3.0",
+    @deprecated(deprecated_in="0.3.0",
+                removed_in="0.4.0",
                 current_version=__version__,
-                details="use device(serial=serial) instead")
-    def device_with_serial(self, serial=None) -> 'AdbDevice':
-        if not serial:
-            return self.must_one_device()
-        return AdbDevice(self, serial)
+                details="use device() instead")
+    def must_one_device(self):
+        return self.device()
 
     def device(self, serial=None) -> 'AdbDevice':
         if not serial:
-            return self.must_one_device()
+            ds = self.device_list()
+            if len(ds) == 0:
+                raise RuntimeError("Can't find any android device/emulator")
+            if len(ds) > 1:
+                raise RuntimeError(
+                    "more than one device/emulator, please specify the serial number"
+                )
+            return ds[0]
         return AdbDevice(self, serial)
 
     def sync(self, serial) -> 'Sync':

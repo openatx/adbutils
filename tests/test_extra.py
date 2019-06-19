@@ -4,12 +4,12 @@ extra functions test
 效果生效与否不好判定（例如屏幕亮暗），部分用例仅作冒烟测试
 """
 
-import adbutils
 import time
-from adbutils import AdbDevice
 
-# adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
-# target_device = adb.device()
+import pytest
+
+import adbutils
+from adbutils import AdbDevice
 
 
 def test_say_hello(device: AdbDevice):
@@ -28,7 +28,7 @@ def test_switch_screen(device: AdbDevice):
 
 def test_switch_airplane(device: AdbDevice):
     device.switch_airplane(True)
-    device.switch_screen(False)
+    device.switch_airplane(False)
 
 
 def test_switch_wifi(device: AdbDevice):
@@ -49,12 +49,14 @@ def test_set_ime(device: AdbDevice):
     pass
 
 
+@pytest.mark.skip("ifconfig is not working for all device")
 def test_wlan_ip(device: AdbDevice):
     device.switch_airplane(True)
     device.switch_wifi(True)
     time.sleep(3)
     ip = device.wlan_ip()
     assert ip, 'ip is empty'
+
 
 def test_current_app(device: AdbDevice):
     info = device.current_app()
