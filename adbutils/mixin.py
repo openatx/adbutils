@@ -42,7 +42,7 @@ class LogcatManager(object):
 
         self._pid = self._get_logcat_pid()
 
-    def stop(self, pc_dst_file: str = None):
+    def stop(self, pc_dst_file: str = None, remove: bool = None):
         """
         stop logcat catcher
 
@@ -54,6 +54,9 @@ class LogcatManager(object):
 
         if pc_dst_file:
             self.sync_to_pc(pc_dst_file)
+
+        if remove:
+            self._device._run(['rm', self._phone_dst_file])
 
         self.reset()
 
