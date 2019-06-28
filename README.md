@@ -153,6 +153,33 @@ d.keyevent("HOME")
 
 For further usage, please read [mixin.py](adbutils/mixin.py) for details.
 
+## Logcat
+
+Logcat is really important in android development and test. And you can use it easily:
+
+```python
+import adbutils
+import time
+
+adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
+device = adb.device()
+
+# start catching log, and save them to /sdcard/something.txt (in your phone)
+device.logcat.start('/sdcard/something.txt')
+
+time.sleep(5)
+# and you can sync the log file anytime
+device.logcat.sync_to_pc('./something1.txt')
+time.sleep(5)
+
+# stop catching log
+device.logcat.stop()
+# or you can stop it and pull it to your pc easily
+device.logcat.stop('./something1.txt')
+# with removing the origin file in your phone?
+device.logcat.stop('./something1.txt', remove=True)
+```
+
 ## Develop
 ```sh
 git clone https://github.com/openatx/adbutils adbutils
