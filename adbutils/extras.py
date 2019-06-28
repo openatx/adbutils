@@ -1,8 +1,68 @@
 import typing
 import re
 import time
+import threading
 
 import adbutils
+
+
+class LogcatManager(object):
+    def __init__(self, device):
+        self._device = device
+
+        self._phone_dst_file: str = ''
+        self._status: bool = False
+        self._pid: str = ''
+
+    def start(self, phone_dst_file: str):
+        """
+        start logcat catcher, and save log to dst file in android phone
+
+        :param phone_dst_file: android path, eg: /sdcard/ttt.txt
+        :return:
+        """
+        assert not self._status, f'device [{self._device.serial}] logcat already started'
+        self._phone_dst_file = phone_dst_file
+        self._status = True
+
+        threading.Thread(
+            target=self._device._execute,
+            args=(f'logcat > {self._phone_dst_file}',)
+        ).start()
+
+        self._pid = self._get_logcat_pid()
+
+    def stop(self, pc_dst_file: str = None):
+        """
+        stop logcat catcher
+
+        :param pc_dst_file: save logcat file to your pc
+        :return:
+        """
+        assert self._status, f'device [{self._device.serial}] logcat is off now'
+        self._kill_logcat()
+
+        if pc_dst_file:
+            self.sync_to_pc(pc_dst_file)
+
+        self.reset()
+
+    def reset(self):
+        self._phone_dst_file: str = ''
+        self._status: bool = False
+        self._pid: str = ''
+
+    def sync_to_pc(self, pc_dst_file: str):
+        assert self._status and self._phone_dst_file
+        self._device.pull(self._phone_dst_file, pc_dst_file)
+
+    def _get_logcat_pid(self):
+        process_info = self._device._execute(['ps', '|', 'grep', 'logcat'])
+        pid = [_ for _ in process_info.split(' ') if _][1]
+        return pid
+
+    def _kill_logcat(self):
+        self._device._execute(['kill', '-9', self._pid])
 
 
 class ExtraUtilsMixin(object):

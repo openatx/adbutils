@@ -19,7 +19,7 @@ import six
 import whichcraft
 from deprecation import deprecated
 
-from adbutils.extras import ExtraUtilsMixin
+from adbutils.extras import ExtraUtilsMixin, LogcatManager
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -281,6 +281,7 @@ class AdbDevice(ExtraUtilsMixin):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
+        self.logcat = LogcatManager(self)
 
     @property
     def serial(self):
@@ -364,6 +365,9 @@ class AdbDevice(ExtraUtilsMixin):
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
+
+    def pull(self, local: str, remote: str):
+        self.adb_output("pull", local, remote)
 
 
 class Sync():
