@@ -10,16 +10,18 @@ Commands:
 from __future__ import absolute_import
 
 import argparse
+import hashlib
 import os
 import re
+import shutil
 import sys
 import time
-import hashlib
+import zipfile
 
 import requests
 
 from adbutils import adb as adbclient
-from adbutils import AdbError, AdbInstallError
+from adbutils.errors import AdbError, AdbInstallError
 
 MB = 1024 * 1024
 
@@ -80,24 +82,33 @@ def main():
     # formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-s", "--serial", help="device serial number")
-    parser.add_argument(
-        "-V",
-        "--server-version",
-        action="store_true",
-        help="show adb server version")
-    parser.add_argument(
-        "-l", "--list", action="store_true", help="list devices")
-    parser.add_argument(
-        "-i", "--install", help="install from local apk or url")
+    parser.add_argument("-V",
+                        "--server-version",
+                        action="store_true",
+                        help="show adb server version")
+    parser.add_argument("-l",
+                        "--list",
+                        action="store_true",
+                        help="list devices")
+    parser.add_argument("-i",
+                        "--install",
+                        help="install from local apk or url")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
-    parser.add_argument(
-        "--clear", action="store_true", help="clear all data when uninstall")
-    parser.add_argument(
-        "--list-packages", action="store_true", help="list packages installed")
+    parser.add_argument("--clear",
+                        action="store_true",
+                        help="clear all data when uninstall")
+    parser.add_argument("--list-packages",
+                        action="store_true",
+                        help="list packages installed")
     parser.add_argument("--grep", help="filter matched package names")
     parser.add_argument("--connect", type=str, help="connect remote device")
-    parser.add_argument(
-        "--shell", action="store_true", help="run shell command")
+    parser.add_argument("--shell",
+                        action="store_true",
+                        help="run shell command")
+    parser.add_argument("--minicap",
+                        action="store_true",
+                        help="install minicap and minitouch to device")
+    parser.add_argument("--screenshot", type=str, help="take screenshot")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -122,7 +133,7 @@ def main():
             print(format.format(*row))
         return
 
-    d = adbclient.device_with_serial(args.serial)
+    d = adbclient.device(args.serial)
 
     if args.shell:
         output = d.shell(args.args)
@@ -147,11 +158,11 @@ def main():
         print("Success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
-        d.shell_output("mv", dst, new_dst)
+        d.shell(["mv", dst, new_dst])
         dst = new_dst
         info = d.sync.stat(dst)
-        print("verify pushed apk, md5: %s, size: %s" % (r._hash,
-                                                        humanize(info.size)))
+        print("verify pushed apk, md5: %s, size: %s" %
+              (r._hash, humanize(info.size)))
         assert info.size == r.copied
 
         print("install to android system ...")
@@ -161,18 +172,84 @@ def main():
             print("Success installed, time used %d seconds" %
                   (time.time() - start))
         except AdbInstallError as e:
-            sys.exit("Failure " + e.reason + "\n" +
-                     "Remote apk is not removed. Manually install command:\n\t"
-                     + "adb shell pm install -r -t " + dst)
+            sys.exit(
+                "Failure " + e.reason + "\n" +
+                "Remote apk is not removed. Manually install command:\n\t" +
+                "adb shell pm install -r -t " + dst)
 
     elif args.uninstall:
-        d.shell_output("pm", "uninstall", args.uninstall)
+        d.shell(["pm", "uninstall", args.uninstall])
 
     elif args.list_packages:
         patten = re.compile(args.grep or ".*")
         for p in d.list_packages():
             if patten.search(p):
                 print(p)
+
+    elif args.minicap:
+
+        def cache_download(url, dst):
+            if os.path.exists(dst):
+                print("Use cached", dst)
+                return
+            print("Download {} from {}".format(dst, url))
+            resp = requests.get(url, stream=True)
+            resp.raise_for_status()
+            length = int(resp.headers.get("Content-Length", 0))
+            r = ReadProgress(resp.raw, length)
+            with open(dst + ".cached", "wb") as f:
+                shutil.copyfileobj(r, f)
+            shutil.move(dst + ".cached", dst)
+
+        def push_zipfile(path: str,
+                         dest: str,
+                         mode=0o755,
+                         zipfile_path: str = "vendor/stf-binaries-master.zip"):
+            """ push minicap and minitouch from zip """
+            with zipfile.ZipFile(zipfile_path) as z:
+                if path not in z.namelist():
+                    print("WARNING: stf stuff %s not found", path)
+                    return
+                with z.open(path) as f:
+                    d.sync.push(f, dest, mode)
+
+        zipfile_path = "stf-binaries.zip"
+        cache_download(
+            "https://github.com/openatx/stf-binaries/archive/0.2.zip",
+            zipfile_path)
+        zip_folder = "stf-binaries-0.2"
+
+        sdk = d.getprop("ro.build.version.sdk")  # eg 26
+        abi = d.getprop('ro.product.cpu.abi')  # eg arm64-v8a
+        abis = (d.getprop('ro.product.cpu.abilist').strip() or abi).split(",")
+        # return
+        print("sdk: %s, abi: %s, support-abis: %s" %
+              (sdk, abi, ','.join(abis)))
+        print("Push minicap+minicap.so to device")
+        prefix = zip_folder + "/node_modules/minicap-prebuilt/prebuilt/"
+        push_zipfile(prefix + abi + "/lib/android-" + sdk + "/minicap.so",
+                     "/data/local/tmp/minicap.so", 0o644, zipfile_path)
+        push_zipfile(prefix + abi + "/bin/minicap", "/data/local/tmp/minicap",
+                     0o0755, zipfile_path)
+
+        print("Push minitouch to device")
+        prefix = zip_folder + "/node_modules/minitouch-prebuilt/prebuilt/"
+        push_zipfile(prefix + abi + "/bin/minitouch",
+                     "/data/local/tmp/minitouch", 0o0755, zipfile_path)
+
+        # check if minicap installed
+        output = d.shell([
+            "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"
+        ])
+        print(output)
+        print(
+            "If you see JSON output, it means minicap installed successfully")
+    
+    if args.screenshot:
+        remote_tmp_path = "/data/local/tmp/screenshot.png"
+        d.shell(["rm", remote_tmp_path])
+        d.shell(["screencap", "-p", remote_tmp_path])
+        d.sync.pull(remote_tmp_path, args.screenshot)
 
 
 if __name__ == "__main__":

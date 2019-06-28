@@ -16,7 +16,7 @@ def test_shell(device):
     assert output == "/"
 
     output = device.shell("pwd", rstrip=False)
-    assert output == "/\n"
+    assert output in ["/\n", "/\r\n"]
 
 
 def test_adb_connect():
