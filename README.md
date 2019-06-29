@@ -164,8 +164,14 @@ import time
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
 device = adb.device()
 
+# clean logcat before catching
+device.logcat.clean()
+
 # start catching log, and save them to /sdcard/something.txt (in your phone)
 device.logcat.start('/sdcard/something.txt')
+# with some extra args?
+# same as: `adb logcat -v long ActivityManager:I *:S`
+device.logcat.start('/sdcard/something.txt', arg_str='-v long ActivityManager:I *:S')
 
 time.sleep(5)
 # and you can sync the log file anytime
@@ -179,6 +185,8 @@ device.logcat.stop('./something1.txt')
 # with removing the origin file in your phone?
 device.logcat.stop('./something1.txt', remove=True)
 ```
+
+More about logcat: [awesome-adb](https://github.com/mzlogin/awesome-adb/blob/master/README.en.md#android-log)
 
 ## Develop
 ```sh
