@@ -5,10 +5,8 @@ extra functions test
 """
 
 import time
-
 import pytest
-
-import adbutils
+import os
 from adbutils import AdbDevice
 
 
@@ -62,3 +60,19 @@ def test_current_app(device: AdbDevice):
     info = device.current_app()
     assert 'package' in info
     assert 'activity' in info
+
+
+def test_logcat(device: AdbDevice):
+    pc_dst = './something1.txt'
+    android_dst = '/sdcard/something.txt'
+
+    device.logcat.start(android_dst)
+
+    time.sleep(2)
+    device.logcat.sync_to_pc(pc_dst)
+    assert device.say_hello(), 'should not abort other actions'
+    time.sleep(2)
+
+    device.logcat.stop(pc_dst, remove=True)
+    assert os.path.isfile(pc_dst)
+    os.remove(pc_dst)

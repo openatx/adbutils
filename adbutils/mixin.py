@@ -24,20 +24,24 @@ class LogcatManager(object):
         self._status: bool = False
         self._pid: str = ''
 
-    def start(self, phone_dst_file: str):
+    def start(self, phone_dst_file: str, arg_str: str = None):
         """
         start logcat catcher, and save log to dst file in android phone
 
         :param phone_dst_file: android path, eg: /sdcard/ttt.txt
+        :param arg_str: extra args, likes: priority, tag or something else
         :return:
         """
         assert not self._status, f'device [{self._device.serial}] logcat already started'
         self._phone_dst_file = phone_dst_file
         self._status = True
 
+        if not arg_str:
+            arg_str = ''
+
         threading.Thread(
             target=self._device._run,
-            args=(f'logcat > {self._phone_dst_file}',)
+            args=(f'logcat {arg_str} > {self._phone_dst_file}',)
         ).start()
 
         self._pid = self._get_logcat_pid()
@@ -47,6 +51,7 @@ class LogcatManager(object):
         stop logcat catcher
 
         :param pc_dst_file: save logcat file to your pc
+        :param remove: remove origin log file after stop
         :return:
         """
         assert self._status, f'device [{self._device.serial}] logcat is off now'
@@ -61,11 +66,17 @@ class LogcatManager(object):
         self.reset()
 
     def reset(self):
+        """ reset configure """
         self._phone_dst_file: str = ''
         self._status: bool = False
         self._pid: str = ''
 
+    def clean(self):
+        """ clean logcat (same as logcat -c) """
+        self._device._run(['logcat', '-c'])
+
     def sync_to_pc(self, pc_dst_file: str):
+        """ sync log file, from android to pc """
         assert self._status and self._phone_dst_file
         self._device.pull(self._phone_dst_file, pc_dst_file)
 
