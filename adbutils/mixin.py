@@ -214,8 +214,12 @@ class ExtraUtilsMixin(object):
 
     def _raw_window_size(self) -> WindowSize:
         output = self.shell("wm size")
+        o = re.search(r"Override size: (\d+)x(\d+)", output)
         m = re.search(r"Physical size: (\d+)x(\d+)", output)
-        if m:
+        if o:
+            w, h = o.group(1), o.group(2)
+            return WindowSize(int(w), int(h))
+        elif m:
             w, h = m.group(1), m.group(2)
             return WindowSize(int(w), int(h))
 
