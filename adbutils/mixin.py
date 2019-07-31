@@ -15,9 +15,8 @@ _DISPLAY_RE = re.compile(
 WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
 
-class ExtraUtilsMixin(object):
+class ShellMixin(object):
     """ provide custom functions for some complex operations """
-
     def _run(self, cmd) -> str:
         return self.shell(cmd)
 
@@ -273,7 +272,7 @@ class ExtraUtilsMixin(object):
         for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
             buf += chunk
         return buf.decode("utf-8")
-    
+
     @retry(AdbError, delay=.5, tries=3, jitter=.1)
     def current_app(self):
         """
@@ -296,8 +295,8 @@ class ExtraUtilsMixin(object):
         )
         m = _focusedRE.search(self._run(['dumpsys', 'window', 'windows']))
         if m:
-            return dict(
-                package=m.group('package'), activity=m.group('activity'))
+            return dict(package=m.group('package'),
+                        activity=m.group('activity'))
 
         # try: adb shell dumpsys activity top
         _activityRE = re.compile(
@@ -307,10 +306,9 @@ class ExtraUtilsMixin(object):
         ms = _activityRE.finditer(output)
         ret = None
         for m in ms:
-            ret = dict(
-                package=m.group('package'),
-                activity=m.group('activity'),
-                pid=int(m.group('pid')))
+            ret = dict(package=m.group('package'),
+                       activity=m.group('activity'),
+                       pid=int(m.group('pid')))
         if ret:  # get last result
             return ret
         raise AdbError("Couldn't get focused app")

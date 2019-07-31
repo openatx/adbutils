@@ -120,7 +120,7 @@ com.github.uiautomator
 
 For more usage, please see the code for details. (Sorry I'm too lazy.)
 
-## Extra Functions
+## Extended Functions
 
 AdbUtils provided some custom functions for some complex operations.
 
@@ -152,6 +152,22 @@ d.keyevent("HOME")
 ```
 
 For further usage, please read [mixin.py](adbutils/mixin.py) for details.
+
+## Examples
+Record video using screenrecord
+
+```python
+stream = d.shell("screenrecord /sdcard/s.mp4", stream=True)
+time.sleep(3) # record for 3 seconds
+with stream:
+	stream.send("\003") # send Ctrl+C
+	stream.read_until_close()
+	stream.close()
+
+start = time.time()
+print("Video total time is about", time.time() - start)
+d.sync.pull("/sdcard/s.mp4", "s.mp4") # pulling video
+```
 
 ## Develop
 ```sh

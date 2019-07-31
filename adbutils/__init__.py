@@ -20,7 +20,7 @@ import six
 import whichcraft
 from deprecation import deprecated
 
-from adbutils.mixin import ExtraUtilsMixin
+from adbutils.mixin import ShellMixin
 from adbutils.errors import AdbError
 
 _OKAY = "OKAY"
@@ -172,25 +172,39 @@ class AdbClient(object):
             c.check_okay()
             return c.read_string()
 
-    def shell(self, serial, command: Union[str, list, tuple]) -> str:
+    def shell(self,
+              serial: str,
+              command: Union[str, list, tuple],
+              stream: bool = False) -> str:
         """Run shell in android and return output
         Args:
             serial (str)
             command: list, tuple or str
+            stream (bool): return stream instead of string output
 
         Returns:
-            str
+            str or socket
         """
         assert isinstance(serial, six.string_types)
         if isinstance(command, (list, tuple)):
             command = subprocess.list2cmdline(command)
         assert isinstance(command, six.string_types)
-        with self._connect() as c:
+        c = self._connect()
+        try:
             c.send("host:transport:" + serial)
             c.check_okay()
             c.send("shell:" + command)
             c.check_okay()
+            if stream:
+                return c
             return c.read_until_close()
+        except:
+            if stream:
+                c.close()
+            raise
+        finally:
+            if not stream:
+                c.close()
 
     def forward_list(self, serial: Union[None, str] = None):
         with self._connect() as c:
@@ -275,7 +289,7 @@ class AdbClient(object):
         return Sync(self, serial)
 
 
-class AdbDevice(ExtraUtilsMixin):
+class AdbDevice(ShellMixin):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
@@ -315,11 +329,15 @@ class AdbDevice(ExtraUtilsMixin):
                     "subprocess", cmdline,
                     e.output.decode('utf-8', errors='ignore'))
 
-    def shell(self, cmdargs: Union[str, list, tuple], rstrip=True) -> str:
+    def shell(self,
+              cmdargs: Union[str, list, tuple],
+              stream: bool = False,
+              rstrip=True) -> str:
         """Run shell inside device and get it's content
 
         Args:
             rstrip (bool): strip the last empty line (Default: True)
+            stream (bool): return stream instead of string output (Default: False)
 
         Returns:
             string of output
@@ -331,10 +349,10 @@ class AdbDevice(ExtraUtilsMixin):
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = subprocess.list2cmdline(cmdargs)
-        output = self._client.shell(self._serial, cmdargs)
-        if rstrip:
-            output = output.rstrip()
-        return output
+        ret = self._client.shell(self._serial, cmdargs, stream=stream)
+        if stream:
+            return ret
+        return ret.rstrip() if rstrip else ret
 
     @deprecated(deprecated_in="0.2.4",
                 removed_in="0.3.0",
