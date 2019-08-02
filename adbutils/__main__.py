@@ -11,6 +11,7 @@ from __future__ import absolute_import
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -100,6 +101,9 @@ def main():
     parser.add_argument("--list-packages",
                         action="store_true",
                         help="list packages installed")
+    parser.add_argument("-p",
+                        "--package",
+                        help="show package info in json format")
     parser.add_argument("--grep", help="filter matched package names")
     parser.add_argument("--connect", type=str, help="connect remote device")
     parser.add_argument("--shell",
@@ -109,6 +113,7 @@ def main():
                         action="store_true",
                         help="install minicap and minitouch to device")
     parser.add_argument("--screenshot", type=str, help="take screenshot")
+    parser.add_argument("-b", "--browser", help="open browser in device")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -244,12 +249,19 @@ def main():
         print(output)
         print(
             "If you see JSON output, it means minicap installed successfully")
-    
-    if args.screenshot:
+
+    elif args.screenshot:
         remote_tmp_path = "/data/local/tmp/screenshot.png"
         d.shell(["rm", remote_tmp_path])
         d.shell(["screencap", "-p", remote_tmp_path])
         d.sync.pull(remote_tmp_path, args.screenshot)
+
+    elif args.browser:
+        d.open_browser(args.browser)
+
+    elif args.package:
+        info = d.package_info(args.package)
+        print(json.dumps(info, indent=4))
 
 
 if __name__ == "__main__":

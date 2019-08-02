@@ -256,6 +256,12 @@ class ShellMixin(object):
     def app_clear(self, package_name: str):
         self._run(["pm", "clear", package_name])
 
+    def open_browser(self, url: str):
+        if not re.match("^https?://", url):
+            url = "https://" + url
+        self._run(
+            ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
+
     def dump_hierarchy(self):
         """
         uiautomator dump
