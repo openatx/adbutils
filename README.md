@@ -90,36 +90,6 @@ if info:
     print(info) # expect {"version_name": "1.2.3", "version_code": "12", "signature": "0xff132"}
 ```
 
-## Run in command line 命令行使用
-
-```bash
-# List devices
-$ python -m adbutils -l
-8d1f93be              MI 5s
-192.168.190.101:5555  Google Nexus 5X - 7.0.0 - API 24 - 1080x1920
-
-# Show adb server version
-$ python -m adbutils -V
-39
-
-# Install apk from local filesystem 安装本地apk(带有进度)
-$ python -m adbutils -i some.apk
-# Install apk from URL 通过URL安装apk(带有进度)
-$ python -m adbutils -i http://example.com/some.apk
-
-# Uninstall 卸载应用
-$ python -m adbutils -u com.github.example
-
-# List installed packages 列出所有应用
-$ python -m adbutils --list-packages
-com.android.adbkeyboard
-com.buscode.whatsinput
-com.finalwire.aida64
-com.github.uiautomator
-```
-
-For more usage, please see the code for details. (Sorry I'm too lazy.)
-
 ## Extended Functions
 
 AdbUtils provided some custom functions for some complex operations.
@@ -193,12 +163,51 @@ pip install pytest
 pytest tests/
 ```
 
+## Run in command line 命令行使用
+
+```bash
+# List devices
+$ python -m adbutils -l
+8d1f93be              MI 5s
+192.168.190.101:5555  Google Nexus 5X - 7.0.0 - API 24 - 1080x1920
+
+# Show adb server version
+$ python -m adbutils -V
+39
+
+# Install apk from local filesystem 安装本地apk(带有进度)
+$ python -m adbutils -i some.apk
+# Install apk from URL 通过URL安装apk(带有进度)
+$ python -m adbutils -i http://example.com/some.apk
+
+# Uninstall 卸载应用
+$ python -m adbutils -u com.github.example
+
+# List installed packages 列出所有应用
+$ python -m adbutils --list-packages
+com.android.adbkeyboard
+com.buscode.whatsinput
+com.finalwire.aida64
+com.github.uiautomator
+```
+
+For convenience of using logcat, I put put pidcat inside.
+
+```
+python3 -m adbutils.pidcat [package]
+```
+
+![](assets/images/pidcat.png)
+
+For more usage, please see the code for details.
+
 # Thanks
 - [swind pure-python-adb](https://github.com/Swind/pure-python-adb)
 - [openstf/adbkit](https://github.com/openstf/adbkit)
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
 - ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
 - [Awesome ADB](https://github.com/mzlogin/awesome-adb)
+- [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
 
 # LICENSE
 [MIT](LICENSE)
