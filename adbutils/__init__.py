@@ -368,7 +368,7 @@ class AdbDevice(ShellMixin):
         """ forward remote port to local random port """
         if isinstance(remote, int):
             remote = "tcp:" + str(remote)
-        for f in self._client.forward_list():
+        for f in self.forward_list():
             if f.serial == self._serial and f.remote == remote and f.local.startswith(
                     "tcp:"):
                 return int(f.local[len("tcp:"):])
