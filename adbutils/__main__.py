@@ -152,6 +152,26 @@ def main():
             print(format.format(*row))
         return
 
+    if args.qrcode:
+        from http.server import ThreadingHTTPServer
+        from http.server import SimpleHTTPRequestHandler
+
+        filename = args.qrcode
+        port = 8000
+        url = "http://%s:%d/%s" % (current_ip(), port, filename)
+        print("File URL:", url)
+        try:
+            import qrcode
+            qr = qrcode.QRCode(border=2)
+            qr.add_data(url)
+            qr.print_ascii(tty=True)
+        except ImportError:
+            print("In order to show QRCode, you need install with: pip3 install qrcode")
+
+        httpd = ThreadingHTTPServer(('', port), SimpleHTTPRequestHandler)
+        httpd.serve_forever()
+        return
+
     d = adbclient.device(args.serial)
 
     if args.shell:
@@ -276,25 +296,6 @@ def main():
     elif args.package:
         info = d.package_info(args.package)
         print(json.dumps(info, indent=4))
-
-    elif args.qrcode:
-        from http.server import ThreadingHTTPServer
-        from http.server import SimpleHTTPRequestHandler
-
-        filename = args.qrcode
-        port = 8000
-        url = "http://%s:%d/%s" % (current_ip(), port, filename)
-        print("File URL:", url)
-        try:
-            import qrcode
-            qr = qrcode.QRCode(border=2)
-            qr.add_data(url)
-            qr.print_ascii(tty=True)
-        except ImportError:
-            print("In order to show QRCode, you need install with: pip3 install qrcode")
-
-        httpd = ThreadingHTTPServer(('', port), SimpleHTTPRequestHandler)
-        httpd.serve_forever()
 
 
 if __name__ == "__main__":
