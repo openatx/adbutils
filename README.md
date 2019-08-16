@@ -189,6 +189,14 @@ com.android.adbkeyboard
 com.buscode.whatsinput
 com.finalwire.aida64
 com.github.uiautomator
+
+# Show URL of file QRCode 
+$ python -m adbutils --qrcode some.apk
+.--------.
+|        |
+| qrcode |
+|        |
+\--------/
 ```
 
 For convenience of using logcat, I put put pidcat inside.

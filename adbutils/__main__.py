@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import sys
+import socket
 import time
 import zipfile
 
@@ -29,6 +30,18 @@ MB = 1024 * 1024
 
 def humanize(n: int) -> str:
     return '%.1f MB' % (float(n) / MB)
+
+
+def current_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        return ip
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 
 class ReadProgress():
@@ -95,6 +108,7 @@ def main():
                         "--install",
                         help="install from local apk or url")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
+    parser.add_argument("--qrcode", help="show qrcode of the specified file")
     parser.add_argument("--clear",
                         action="store_true",
                         help="clear all data when uninstall")
@@ -262,6 +276,25 @@ def main():
     elif args.package:
         info = d.package_info(args.package)
         print(json.dumps(info, indent=4))
+
+    elif args.qrcode:
+        from http.server import ThreadingHTTPServer
+        from http.server import SimpleHTTPRequestHandler
+
+        filename = args.qrcode
+        port = 8000
+        url = "http://%s:%d/%s" % (current_ip(), port, filename)
+        print("File URL:", url)
+        try:
+            import qrcode
+            qr = qrcode.QRCode(border=2)
+            qr.add_data(url)
+            qr.print_ascii(tty=True)
+        except ImportError:
+            print("In order to show QRCode, you need install with: pip3 install qrcode")
+
+        httpd = ThreadingHTTPServer(('', port), SimpleHTTPRequestHandler)
+        httpd.serve_forever()
 
 
 if __name__ == "__main__":
