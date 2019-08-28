@@ -107,6 +107,7 @@ def main():
     parser.add_argument("-i",
                         "--install",
                         help="install from local apk or url")
+    parser.add_argument("--install-confirm", action="store_true", help="auto confirm when install")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
     parser.add_argument("--qrcode", help="show qrcode of the specified file")
     parser.add_argument("--clear",
@@ -205,6 +206,14 @@ def main():
         assert info.size == r.copied
 
         print("install to android system ...")
+        if args.install_confirm:
+            # Beta
+            import uiautomator2 as u2
+            ud = u2.connect(args.serial)
+            ud.xpath.when("允许").click()
+            ud.xpath.when("安装").click()
+            ud.xpath.watch_background(2.0)
+
         try:
             start = time.time()
             d.install_remote(dst, clean=True)
