@@ -107,7 +107,7 @@ def main():
     parser.add_argument("-i",
                         "--install",
                         help="install from local apk or url")
-    parser.add_argument("--install-confirm", action="store_true", help="auto confirm when install")
+    parser.add_argument("--install-confirm", action="store_true", help="auto confirm when install (based on uiautomator2)")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
     parser.add_argument("--qrcode", help="show qrcode of the specified file")
     parser.add_argument("--clear",

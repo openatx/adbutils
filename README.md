@@ -199,13 +199,24 @@ $ python -m adbutils --qrcode some.apk
 \--------/
 ```
 
+### Color Logcat
+
 For convenience of using logcat, I put put pidcat inside.
 
-```
+```bash
 python3 -m adbutils.pidcat [package]
 ```
 
 ![](assets/images/pidcat.png)
+
+
+## Experiment
+Install Auto confirm supported(Beta), you need to famillar with [uiautomator2](https://github.com/openatx/uiautomator2) first
+
+```bash
+# Install with auto confirm (Experiment, based on github.com/openatx/uiautomator2)
+$ python -m adbutils --install-confirm -i some.apk
+```
 
 For more usage, please see the code for details.
 
