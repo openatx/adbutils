@@ -26,6 +26,8 @@ import re
 import subprocess
 from subprocess import PIPE
 
+import adbutils
+
 __version__ = '2.1.0'
 
 # yapf: disable
@@ -52,22 +54,11 @@ args = parser.parse_args()
 min_level = LOG_LEVELS_MAP[args.min_level.upper()]
 
 package = args.package
+adb_device = adbutils.adb.device(args.device_serial)
 
-base_adb_command = ['adb']
-if args.device_serial:
-    base_adb_command.extend(['-s', args.device_serial])
-if args.use_device:
-    base_adb_command.append('-d')
-if args.use_emulator:
-    base_adb_command.append('-e')
 
 if args.current_app:
-    system_dump_command = base_adb_command + [
-        "shell", "dumpsys", "activity", "activities"
-    ]
-    system_dump = subprocess.Popen(system_dump_command,
-                                   stdout=PIPE,
-                                   stderr=PIPE).communicate()[0].decode()
+    system_dump = adb_device.shell(["dumpsys", "activity", "activities"])
     running_package_name = re.search(".*TaskRecord.*A[= ]([^ ^}]*)",
                                      system_dump).group(1)
     print("Current package:", running_package_name)
@@ -197,33 +188,21 @@ BUG_LINE  = re.compile(r'.*nativeGetEnabledTags.*')
 BACKTRACE_LINE = re.compile(r'^#(.*?)pc\s(.*?)$')
 # yapf: enable
 
-adb_command = base_adb_command[:]
-adb_command.append('logcat')
-adb_command.extend(['-v', 'brief'])
+
+adb_command = ["logcat", "-v", "brief"]
 
 # Clear log before starting logcat
 if args.clear_logcat:
     adb_clear_command = list(adb_command)
     adb_clear_command.append('-c')
-    adb_clear = subprocess.Popen(adb_clear_command)
-
-    while adb_clear.poll() is None:
-        pass
-
-
-# This is a ducktype of the subprocess.Popen object
-class FakeStdinProcess():
-    def __init__(self):
-        self.stdout = sys.stdin
-
-    def poll(self):
-        return None
+    adb_device.shell(adb_clear_command)
 
 
 if sys.stdin.isatty():
-    adb = subprocess.Popen(adb_command, stdin=PIPE, stdout=PIPE)
+    stream = adb_device.shell(adb_command, stream=True)
+    adb_stdout = stream.conn.makefile("r", encoding="utf-8", errors="replace")
 else:
-    adb = FakeStdinProcess()
+    adb_stdout = sys.stdin
 pids = set()
 last_tag = None
 app_pid = None
@@ -283,16 +262,8 @@ def tag_in_tags_regex(tag, tags):
     return any(re.match(r'^' + t + r'$', tag) for t in map(str.strip, tags))
 
 
-ps_command = base_adb_command + ['shell', 'ps']
-ps_pid = subprocess.Popen(ps_command, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-while True:
-    try:
-        line = ps_pid.stdout.readline().decode('utf-8', 'replace').strip()
-    except KeyboardInterrupt:
-        break
-    if len(line) == 0:
-        break
-
+ps_pid = adb_device.shell("ps || ps -A")
+for line in ps_pid.splitlines():
     pid_match = PID_LINE.match(line)
     if pid_match is not None:
         pid = pid_match.group(1)
@@ -301,11 +272,8 @@ while True:
             seen_pids = True
             pids.add(pid)
 
-while adb.poll() is None:
-    try:
-        line = adb.stdout.readline().decode('utf-8', 'replace').strip()
-    except KeyboardInterrupt:
-        break
+
+for line in adb_stdout:
     if len(line) == 0:
         break
 

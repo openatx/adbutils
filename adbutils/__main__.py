@@ -129,6 +129,7 @@ def main():
                         help="install minicap and minitouch to device")
     parser.add_argument("--screenshot", type=str, help="take screenshot")
     parser.add_argument("-b", "--browser", help="open browser in device")
+    parser.add_argument("--push", help="push local to remote, arg is colon seperated, eg some.txt:/sdcard/s.txt")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -215,16 +216,21 @@ def main():
             ud.xpath.when("安装").click()
             ud.xpath.watch_background(2.0)
 
-        try:
-            start = time.time()
-            d.install_remote(dst, clean=True)
-            print("Success installed, time used %d seconds" %
-                  (time.time() - start))
-        except AdbInstallError as e:
-            sys.exit(
-                "Failure " + e.reason + "\n" +
-                "Remote apk is not removed. Manually install command:\n\t" +
-                "adb shell pm install -r -t " + dst)
+        for i in range(3):
+            try:
+                start = time.time()
+                d.install_remote(dst, clean=True)
+                print("Success installed, time used %d seconds" %
+                    (time.time() - start))
+                break
+            except AdbInstallError as e:
+                if i < 2 and e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
+                    print("Catch error %s, reinstall" % e.reason)
+                    continue
+                sys.exit(
+                    "Failure " + e.reason + "\n" +
+                    "Remote apk is not removed. Manually install command:\n\t" +
+                    "adb shell pm install -r -t " + dst)
 
     elif args.uninstall:
         d.shell(["pm", "uninstall", args.uninstall])
@@ -299,6 +305,13 @@ def main():
         d.shell(["rm", remote_tmp_path])
         d.shell(["screencap", "-p", remote_tmp_path])
         d.sync.pull(remote_tmp_path, args.screenshot)
+
+    elif args.push:
+        local, remote = args.push.split(":", 1)
+        length = os.stat(local).st_size
+        with open(local, "rb") as fd:
+            r = ReadProgress(fd, length)
+            d.sync.push(r, remote, filesize=length)
 
     elif args.browser:
         d.open_browser(args.browser)

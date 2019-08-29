@@ -60,7 +60,7 @@ def adb_path():
 
 
 class _AdbStreamConnection(object):
-    def __init__(self, host=None, port=None):
+    def __init__(self, host, port):
         self.__host = host
         self.__port = port
         self.__conn = None
@@ -68,10 +68,8 @@ class _AdbStreamConnection(object):
         self._connect()
 
     def _create_socket(self):
-        adb_host = self.__host or os.environ.get("ANDROID_ADB_SERVER_HOST",
-                                                 "127.0.0.1")
-        adb_port = self.__port or int(
-            os.environ.get("ANDROID_ADB_SERVER_PORT", 5037))
+        adb_host = self.__host
+        adb_port = self.__port
         s = socket.socket()
         try:
             s.connect((adb_host, adb_port))
@@ -89,7 +87,7 @@ class _AdbStreamConnection(object):
         return self
 
     def close(self):
-        self.conn.close()
+        self.__conn.close()
 
     def __enter__(self):
         return self
@@ -141,7 +139,16 @@ class _AdbStreamConnection(object):
 
 
 class AdbClient(object):
-    def __init__(self, host=None, port=None):
+    def __init__(self, host: str = None, port: int = None):
+        """
+        Args:
+            host (str): default value from env:ANDROID_ADB_SERVER_HOST
+            port (int): default value from env:ANDROID_ADB_SERVER_PORT
+        """
+        if not host:
+            host = os.environ.get("ANDROID_ADB_SERVER_HOST", "127.0.0.1")
+        if not port:
+            port = int(os.environ.get("ANDROID_ADB_SERVER_PORT", 5037))
         self.__host = host
         self.__port = port
 
@@ -274,6 +281,9 @@ class AdbClient(object):
         return self.device()
 
     def device(self, serial=None) -> 'AdbDevice':
+        if not serial:
+            serial = os.environ.get("ANDROID_SERIAL")
+
         if not serial:
             ds = self.device_list()
             if len(ds) == 0:
@@ -426,7 +436,7 @@ class Sync():
     def list(self, path: str):
         return list(self.iter_directory(path))
 
-    def push(self, src, dst: str, mode: int = 0o755):
+    def push(self, src, dst: str, mode: int = 0o755, filesize: int = None):
         # IFREG: File Regular
         # IFDIR: File Directory
         path = dst + "," + str(stat.S_IFREG | mode)
@@ -448,7 +458,8 @@ class Sync():
                 if hasattr(r, "close"):
                     r.close()
         # wait until really pushed
-        # print("TotalSize", total_size, self.stat(dst))
+        # if filesize:
+        #     print("Read: %d Copied: %d" % (filesize, total_size), self.stat(dst))
 
     def iter_content(self, path: str):
         with self._prepare_sync(path, "RECV") as c:

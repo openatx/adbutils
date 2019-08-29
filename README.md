@@ -133,7 +133,6 @@ time.sleep(3) # record for 3 seconds
 with stream:
 	stream.send("\003") # send Ctrl+C
 	stream.read_until_close()
-	stream.close()
 
 start = time.time()
 print("Video total time is about", time.time() - start)
@@ -183,6 +182,9 @@ $ python -m adbutils -i http://example.com/some.apk
 # Uninstall 卸载应用
 $ python -m adbutils -u com.github.example
 
+# Push
+$ python -m adbutils --push local.txt:/sdcard/remote.txt
+
 # List installed packages 列出所有应用
 $ python -m adbutils --list-packages
 com.android.adbkeyboard
@@ -197,6 +199,14 @@ $ python -m adbutils --qrcode some.apk
 | qrcode |
 |        |
 \--------/
+```
+
+### Environment variables
+
+```bash
+ANDROID_SERIAL  serial number to connect to
+ANDROID_ADB_SERVER_HOST adb server host to connect to
+ANDROID_ADB_SERVER_PORT adb server port to connect to
 ```
 
 ### Color Logcat
