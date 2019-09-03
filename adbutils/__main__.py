@@ -22,6 +22,7 @@ import zipfile
 
 import requests
 
+import adbutils
 from adbutils import adb as adbclient
 from adbutils.errors import AdbError, AdbInstallError
 
@@ -89,6 +90,65 @@ class ReadProgress():
         chunk = self.r.read(n)
         self.update(chunk)
         return chunk
+
+
+def _setup_minicap(d: adbutils.AdbDevice):
+    def cache_download(url, dst):
+        if os.path.exists(dst):
+            print("Use cached", dst)
+            return
+        print("Download {} from {}".format(dst, url))
+        resp = requests.get(url, stream=True)
+        resp.raise_for_status()
+        length = int(resp.headers.get("Content-Length", 0))
+        r = ReadProgress(resp.raw, length)
+        with open(dst + ".cached", "wb") as f:
+            shutil.copyfileobj(r, f)
+        shutil.move(dst + ".cached", dst)
+
+    def push_zipfile(path: str,
+                        dest: str,
+                        mode=0o755,
+                        zipfile_path: str = "vendor/stf-binaries-master.zip"):
+        """ push minicap and minitouch from zip """
+        with zipfile.ZipFile(zipfile_path) as z:
+            if path not in z.namelist():
+                print("WARNING: stf stuff %s not found", path)
+                return
+            with z.open(path) as f:
+                d.sync.push(f, dest, mode)
+
+    zipfile_path = "stf-binaries.zip"
+    cache_download(
+        "https://github.com/openatx/stf-binaries/archive/0.2.zip",
+        zipfile_path)
+    zip_folder = "stf-binaries-0.2"
+
+    sdk = d.getprop("ro.build.version.sdk")  # eg 26
+    abi = d.getprop('ro.product.cpu.abi')  # eg arm64-v8a
+    abis = (d.getprop('ro.product.cpu.abilist').strip() or abi).split(",")
+    # return
+    print("sdk: %s, abi: %s, support-abis: %s" %
+            (sdk, abi, ','.join(abis)))
+    print("Push minicap+minicap.so to device")
+    prefix = zip_folder + "/node_modules/minicap-prebuilt/prebuilt/"
+    push_zipfile(prefix + abi + "/lib/android-" + sdk + "/minicap.so",
+                    "/data/local/tmp/minicap.so", 0o644, zipfile_path)
+    push_zipfile(prefix + abi + "/bin/minicap", "/data/local/tmp/minicap",
+                    0o0755, zipfile_path)
+
+    print("Push minitouch to device")
+    prefix = zip_folder + "/node_modules/minitouch-prebuilt/prebuilt/"
+    push_zipfile(prefix + abi + "/bin/minitouch",
+                    "/data/local/tmp/minitouch", 0o0755, zipfile_path)
+
+    # check if minicap installed
+    output = d.shell([
+        "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"
+    ])
+    print(output)
+    print(
+        "If you see JSON output, it means minicap installed successfully")
 
 
 def main():
@@ -241,70 +301,21 @@ def main():
             if patten.search(p):
                 print(p)
 
-    elif args.minicap:
-
-        def cache_download(url, dst):
-            if os.path.exists(dst):
-                print("Use cached", dst)
-                return
-            print("Download {} from {}".format(dst, url))
-            resp = requests.get(url, stream=True)
-            resp.raise_for_status()
-            length = int(resp.headers.get("Content-Length", 0))
-            r = ReadProgress(resp.raw, length)
-            with open(dst + ".cached", "wb") as f:
-                shutil.copyfileobj(r, f)
-            shutil.move(dst + ".cached", dst)
-
-        def push_zipfile(path: str,
-                         dest: str,
-                         mode=0o755,
-                         zipfile_path: str = "vendor/stf-binaries-master.zip"):
-            """ push minicap and minitouch from zip """
-            with zipfile.ZipFile(zipfile_path) as z:
-                if path not in z.namelist():
-                    print("WARNING: stf stuff %s not found", path)
-                    return
-                with z.open(path) as f:
-                    d.sync.push(f, dest, mode)
-
-        zipfile_path = "stf-binaries.zip"
-        cache_download(
-            "https://github.com/openatx/stf-binaries/archive/0.2.zip",
-            zipfile_path)
-        zip_folder = "stf-binaries-0.2"
-
-        sdk = d.getprop("ro.build.version.sdk")  # eg 26
-        abi = d.getprop('ro.product.cpu.abi')  # eg arm64-v8a
-        abis = (d.getprop('ro.product.cpu.abilist').strip() or abi).split(",")
-        # return
-        print("sdk: %s, abi: %s, support-abis: %s" %
-              (sdk, abi, ','.join(abis)))
-        print("Push minicap+minicap.so to device")
-        prefix = zip_folder + "/node_modules/minicap-prebuilt/prebuilt/"
-        push_zipfile(prefix + abi + "/lib/android-" + sdk + "/minicap.so",
-                     "/data/local/tmp/minicap.so", 0o644, zipfile_path)
-        push_zipfile(prefix + abi + "/bin/minicap", "/data/local/tmp/minicap",
-                     0o0755, zipfile_path)
-
-        print("Push minitouch to device")
-        prefix = zip_folder + "/node_modules/minitouch-prebuilt/prebuilt/"
-        push_zipfile(prefix + abi + "/bin/minitouch",
-                     "/data/local/tmp/minitouch", 0o0755, zipfile_path)
-
-        # check if minicap installed
-        output = d.shell([
-            "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"
-        ])
-        print(output)
-        print(
-            "If you see JSON output, it means minicap installed successfully")
-
     elif args.screenshot:
-        remote_tmp_path = "/data/local/tmp/screenshot.png"
-        d.shell(["rm", remote_tmp_path])
-        d.shell(["screencap", "-p", remote_tmp_path])
-        d.sync.pull(remote_tmp_path, args.screenshot)
+        if args.minicap:
+            json_output = d.shell(["LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i", "2&>/dev/null"]).strip()
+            data = json.loads(json_output)
+            w, h, r = data["width"], data["height"], data["rotation"]
+            d.shell(["LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-P", "{0}x{1}@{0}x{1}/{2}".format(w, h, r), "-s", ">/sdcard/minicap.jpg"])
+            d.sync.pull("/sdcard/minicap.jpg", args.screenshot)
+        else:
+            remote_tmp_path = "/data/local/tmp/screenshot.png"
+            d.shell(["rm", remote_tmp_path])
+            d.shell(["screencap", "-p", remote_tmp_path])
+            d.sync.pull(remote_tmp_path, args.screenshot)
+    
+    elif args.minicap: # without args.screenshot
+        _setup_minicap(d)
 
     elif args.push:
         local, remote = args.push.split(":", 1)

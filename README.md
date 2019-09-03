@@ -199,6 +199,15 @@ $ python -m adbutils --qrcode some.apk
 | qrcode |
 |        |
 \--------/
+
+# screenshot with screencap
+$ python -m adbutils --screenshot screen.jpg 
+
+# download minicap, minicap.so to device
+$ python -m adbutils --minicap
+
+# take screenshot with minicap
+$ python -m adbutils --minicap --screenshot screen.jpg # screenshot with minicap
 ```
 
 ### Environment variables
