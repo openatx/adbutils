@@ -100,6 +100,57 @@ class ShellMixin(object):
         return self._run(
             ['input', 'swipe', x1, y1, x2, y2,
              str(int(duration * 1000))])
+    
+    def typing(self, text: str):
+        """ 
+        type a given text 
+        Args:
+            text: text to be type
+        """
+        escaped_text = self.escape_special_characters(text)
+        return self._run(['input', 'text', escaped_text])
+    
+    @staticmethod
+    def escape_special_characters(text):
+        """
+        A helper that escape special characters
+        
+        Args:
+            text: str
+        """
+        escaped = text.translate(str.maketrans({"-":  r"\-",
+                                                "+":  r"\+",
+                                                "[":  r"\[",
+                                                "]":  r"\]",
+                                                "(":  r"\(",
+                                                ")":  r"\)",
+                                                "{":  r"\{",
+                                                "}":  r"\}",
+                                                "\\": r"\\\\",
+                                                "^":  r"\^",
+                                                "$":  r"\$",
+                                                "*":  r"\*",
+                                                ".":  r"\.",
+                                                ",":  r"\,",
+                                                ":":  r"\:",
+                                                "~":  r"\~",
+                                                ";":  r"\;",
+                                                ">":  r"\>",
+                                                "<":  r"\<",
+                                                "%":  r"\%",
+                                                "#":  r"\#",
+                                                "\'":  r"\\'",
+                                                "\"":  r'\\"',
+                                                "`":  r"\`",
+                                                "!":  r"\!",
+                                                "?":  r"\?",
+                                                "|":  r"\|",
+                                                "=":  r"\=",
+                                                "@":  r"\@",
+                                                "/":  r"\/",
+                                                "_":  r"\_",
+                                                "&":  r"\&"}))
+        return escaped
 
     def wlan_ip(self) -> str:
         """
