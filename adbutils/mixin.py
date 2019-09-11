@@ -101,17 +101,18 @@ class ShellMixin(object):
             ['input', 'swipe', x1, y1, x2, y2,
              str(int(duration * 1000))])
     
-    def typing(self, text: str):
+    def send_keys(self, text: str):
         """ 
-        type a given text 
+        Type a given text 
+
         Args:
             text: text to be type
         """
-        escaped_text = self.escape_special_characters(text)
+        escaped_text = self._escape_special_characters(text)
         return self._run(['input', 'text', escaped_text])
     
     @staticmethod
-    def escape_special_characters(text):
+    def _escape_special_characters(text):
         """
         A helper that escape special characters
         
@@ -149,6 +150,7 @@ class ShellMixin(object):
                                                 "@":  r"\@",
                                                 "/":  r"\/",
                                                 "_":  r"\_",
+                                                " ":  r"%s", # special
                                                 "&":  r"\&"}))
         return escaped
 

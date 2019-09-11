@@ -272,6 +272,7 @@ def main():
             import uiautomator2 as u2
             ud = u2.connect(args.serial)
             ud.press("home")
+            ud.xpath.when("继续安装").click()
             ud.xpath.when("允许").click()
             ud.xpath.when("安装").click()
             ud.xpath.watch_background(2.0)

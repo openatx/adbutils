@@ -118,6 +118,8 @@ d.package_info("com.github.uiautomator")
 
 d.keyevent("HOME")
 
+d.send_keys("hello world$%^&*") # simulate: adb shell input text "hello%sworld\%\^\&\*"
+
 d.open_browser("https://www.baidu.com") # 打开百度
 # There still too many functions, please see source codes
 ```
