@@ -305,6 +305,12 @@ class ShellMixin(object):
                 "monkey", "-p", package_name, "-c",
                 "android.intent.category.LAUNCHER", "1"
             ])
+    
+    def app_stop(self, package_name: str):
+        """ stop app with "am force-stop"
+        """
+        self._run('am', 'force-stop', package_name)
+
 
     def app_clear(self, package_name: str):
         self._run(["pm", "clear", package_name])
