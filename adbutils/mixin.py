@@ -215,8 +215,8 @@ class ShellMixin(object):
             list of package names
         """
         result = []
-        output = self._run(["pm", "list", "packages", "-3"])
-        for m in re.finditer(r'^package:([^\s]+)$', output, re.M):
+        output = self._run(["pm", "list", "packages"])
+        for m in re.finditer(r'^package:([^\s]+)\r?$', output, re.M):
             result.append(m.group(1))
         return list(sorted(result))
 
