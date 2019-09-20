@@ -187,6 +187,9 @@ $ python -m adbutils -u com.github.example
 # Push
 $ python -m adbutils --push local.txt:/sdcard/remote.txt
 
+# Pull
+$ python -m adbutils --pull /sdcard/remote.txt # save to ./remote.txt
+
 # List installed packages 列出所有应用
 $ python -m adbutils --list-packages
 com.android.adbkeyboard

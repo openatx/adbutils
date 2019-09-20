@@ -190,6 +190,7 @@ def main():
     parser.add_argument("--screenshot", type=str, help="take screenshot")
     parser.add_argument("-b", "--browser", help="open browser in device")
     parser.add_argument("--push", help="push local to remote, arg is colon seperated, eg some.txt:/sdcard/s.txt")
+    parser.add_argument("--pull", help="push local to remote, arg is colon seperated, eg /sdcard/some.txt")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -324,6 +325,20 @@ def main():
         with open(local, "rb") as fd:
             r = ReadProgress(fd, length)
             d.sync.push(r, remote, filesize=length)
+
+    elif args.pull:
+        remote_path = args.pull
+        target_path = os.path.basename(remote_path)
+        finfo = d.sync.stat(args.pull)
+        if finfo.mode == 0 and finfo.size == 0:
+            sys.exit("Empty remote file: " + remote_path)
+
+        bytes_so_far = 0
+        for chunk in d.sync.iter_content(remote_path):
+            bytes_so_far += len(chunk)
+            percent = bytes_so_far / finfo.size * 100 if finfo.size != 0 else 100.0
+            print(f"\rDownload to {target_path} ... [{bytes_so_far} / {finfo.size}] %.1f %%" % percent, end="", flush=True)
+        print(f"{remote_path} pulled to {target_path}")
 
     elif args.browser:
         d.open_browser(args.browser)

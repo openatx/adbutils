@@ -102,10 +102,8 @@ class _AdbStreamConnection(object):
     def send(self, cmd: str):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
-    def read(self, n: int) -> str:
-        return self.conn.recv(n).decode()
-
     def read_raw(self, n: int) -> bytes:
+        """ read fully """
         t = n
         buffer = b''
         while t > 0:
@@ -115,6 +113,9 @@ class _AdbStreamConnection(object):
             buffer += chunk
             t = n - len(buffer)
         return buffer
+
+    def read(self, n: int) -> str:
+        return self.read_raw(n).decode()
 
     def read_string(self) -> str:
         size = int(self.read(4), 16)
@@ -467,7 +468,7 @@ class Sync():
                 cmd = c.read(4)
                 if cmd == "DONE":
                     break
-                assert cmd == "DATA"
+                assert cmd == "DATA", cmd
                 chunk_size = struct.unpack("<I", c.read_raw(4))[0]
                 chunk = c.read_raw(chunk_size)
                 if len(chunk) != chunk_size:
