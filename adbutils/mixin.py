@@ -377,3 +377,36 @@ class ShellMixin(object):
         if ret:  # get last result
             return ret
         raise AdbError("Couldn't get focused app")
+
+    def remove(self, path: str):
+        """ rm device file """
+        self.shell(["rm", path])
+
+
+    def screenrecord(self, remote_path=None):
+        return _ScreenRecord(self, remote_path)
+        
+
+class _ScreenRecord():
+    def __init__(self, d, remote_path=None):
+        """ The maxium record time is 3 minutes """
+        self._d = d
+        if not remote_path:
+            remote_path = "/sdcard/video-%d.mp4" % int(time.time() * 1000)
+        self._remote_path = remote_path
+        self._stream = self._d.shell(["screenrecord", remote_path], stream=True)
+        self._closed = False
+
+    def close(self):
+        if self._closed:
+            return
+        self._stream.send("\003")
+        self._stream.read_until_close()
+        self._stream.close()
+        self._closed = True
+
+    def close_and_pull(self, path: str):
+        self.close()
+        self._d.sync.pull(self._remote_path, path)
+        self._d.remove(self._remote_path)
+        

@@ -122,6 +122,12 @@ d.send_keys("hello world$%^&*") # simulate: adb shell input text "hello%sworld\%
 
 d.open_browser("https://www.baidu.com") # 打开百度
 # There still too many functions, please see source codes
+
+# run screenrecord to record screen
+r = d.screenrecord()
+# sleep for a while, can not large then 3 minutes
+r.close() # stop recording
+r.close_and_pull("video.mp4") # stop recording and pull video to local fs
 ```
 
 For further usage, please read [mixin.py](adbutils/mixin.py) for details.
