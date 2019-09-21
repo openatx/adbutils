@@ -330,8 +330,8 @@ def main():
         remote_path = args.pull
         target_path = os.path.basename(remote_path)
         finfo = d.sync.stat(args.pull)
-        if finfo.mode == 0 and finfo.size == 0:
-            sys.exit("Empty remote file: " + remote_path)
+        #if finfo.mode == 0 and finfo.size == 0:
+        #    sys.exit("Empty remote file: " + remote_path)
 
         bytes_so_far = 0
         for chunk in d.sync.iter_content(remote_path):
