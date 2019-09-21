@@ -27,6 +27,7 @@ _OKAY = "OKAY"
 _FAIL = "FAIL"
 _DENT = "DENT"  # Directory Entity
 _DONE = "DONE"
+_DATA = "DATA"
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
@@ -466,14 +467,20 @@ class Sync():
         with self._prepare_sync(path, "RECV") as c:
             while True:
                 cmd = c.read(4)
-                if cmd == "DONE":
+                if cmd == _FAIL:
+                    str_size = struct.unpack("<I", c.read_raw(4))[0]
+                    error_message = c.read(str_size)
+                    raise AdbError(error_message)
+                elif cmd == _DONE:
                     break
-                assert cmd == "DATA", cmd
-                chunk_size = struct.unpack("<I", c.read_raw(4))[0]
-                chunk = c.read_raw(chunk_size)
-                if len(chunk) != chunk_size:
-                    raise RuntimeError("read chunk missing")
-                yield chunk
+                elif cmd == _DATA:
+                    chunk_size = struct.unpack("<I", c.read_raw(4))[0]
+                    chunk = c.read_raw(chunk_size)
+                    if len(chunk) != chunk_size:
+                        raise RuntimeError("read chunk missing")
+                    yield chunk
+                else:
+                    raise AdbError("Invalid sync cmd", cmd)
 
     def pull(self, src: str, dst: str) -> int:
         """
@@ -491,6 +498,7 @@ class Sync():
 
 
 adb = AdbClient()
+
 # device = adb.device
 # devices = adb.devices
 
