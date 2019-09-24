@@ -3,9 +3,11 @@ import json
 import re
 import time
 import typing
+import warnings
 from collections import namedtuple
 
 from retry import retry
+
 from adbutils.errors import AdbError, AdbInstallError
 
 _DISPLAY_RE = re.compile(
@@ -383,30 +385,57 @@ class ShellMixin(object):
         self.shell(["rm", path])
 
 
-    def screenrecord(self, remote_path=None):
-        return _ScreenRecord(self, remote_path)
+    def screenrecord(self, remote_path=None, no_autostart=False):
+        """
+        Args:
+            remote_path: device video path
+            no_autostart: do not start screenrecord, when call this method
+        """
+        return _ScreenRecord(self, remote_path, autostart=not no_autostart)
         
 
 class _ScreenRecord():
-    def __init__(self, d, remote_path=None):
+    def __init__(self, d, remote_path=None, autostart=False):
         """ The maxium record time is 3 minutes """
         self._d = d
         if not remote_path:
             remote_path = "/sdcard/video-%d.mp4" % int(time.time() * 1000)
         self._remote_path = remote_path
-        self._stream = self._d.shell(["screenrecord", remote_path], stream=True)
-        self._closed = False
+        self._stream = None
+        self._stopped = False
+        self._started = False
 
-    def close(self):
-        if self._closed:
+        if autostart:
+            self.start()
+
+    def start(self):
+        """ start recording """
+        if self._started:
+            warnings.warn("screenrecord already started", UserWarning)
+            return
+        self._stream = self._d.shell(["screenrecord", self._remote_path], stream=True)
+        self._started = True
+
+    def stop(self):
+        """ stop recording """
+        if not self._started:
+            raise RuntimeError("screenrecord is not started")
+
+        if self._stopped:
             return
         self._stream.send("\003")
         self._stream.read_until_close()
         self._stream.close()
-        self._closed = True
+        self._stopped = True
 
-    def close_and_pull(self, path: str):
-        self.close()
+    def stop_and_pull(self, path: str):
+        """ pull remote to local and remove remote file """
+        self.stop()
         self._d.sync.pull(self._remote_path, path)
         self._d.remove(self._remote_path)
-        
+    
+    def close(self): # alias of stop
+        return self.stop()
+    
+    def close_and_pull(self, path: str): # alias of stop_and_pull
+        return self.stop_and_pull(path=path)
