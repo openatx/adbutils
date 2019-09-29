@@ -211,7 +211,7 @@ def main():
 
     if args.list:
         rows = []
-        for d in adbclient.devices():
+        for d in adbclient.device_list():
             rows.append([d.serial, d.shell("getprop ro.product.model")])
         lens = []
         for col in zip(*rows):
