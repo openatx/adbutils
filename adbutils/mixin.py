@@ -1,4 +1,5 @@
 # coding: utf-8
+import ipaddress
 import json
 import re
 import time
@@ -162,9 +163,17 @@ class ShellMixin(object):
             IndexError
         """
         # TODO better design?
-        result = self._run(['ifconfig', 'wlan0'])
-        return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
+        addr = self._run(["ip", "route", "|", "awk", "'{print $NF}'"])
+        return self.check_addr(addr)
+
+    @staticmethod
+    def check_addr(addr):
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError as e:
+            return str(e)
+        return ip.exploded
     def install(self, apk_path: str):
         """
         sdk = self.getprop('ro.build.version.sdk')
