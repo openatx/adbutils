@@ -124,6 +124,21 @@ d.open_browser("https://www.baidu.com") # 打开百度
 # There still too many functions, please see source codes
 ```
 
+Screenrecord
+
+```
+# run screenrecord to record screen
+r = d.screenrecord()
+# sleep for a while, can not large then 3 minutes
+r.stop() # stop recording
+r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remove video from device
+
+# control start time manually
+r = d.screenrecord(no_autostart=True)
+r.start() # start record
+r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remove video from device
+```
+
 For further usage, please read [mixin.py](adbutils/mixin.py) for details.
 
 ## Examples
@@ -186,6 +201,9 @@ $ python -m adbutils -u com.github.example
 
 # Push
 $ python -m adbutils --push local.txt:/sdcard/remote.txt
+
+# Pull
+$ python -m adbutils --pull /sdcard/remote.txt # save to ./remote.txt
 
 # List installed packages 列出所有应用
 $ python -m adbutils --list-packages

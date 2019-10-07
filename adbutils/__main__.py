@@ -107,9 +107,9 @@ def _setup_minicap(d: adbutils.AdbDevice):
         shutil.move(dst + ".cached", dst)
 
     def push_zipfile(path: str,
-                        dest: str,
-                        mode=0o755,
-                        zipfile_path: str = "vendor/stf-binaries-master.zip"):
+                     dest: str,
+                     mode=0o755,
+                     zipfile_path: str = "vendor/stf-binaries-master.zip"):
         """ push minicap and minitouch from zip """
         with zipfile.ZipFile(zipfile_path) as z:
             if path not in z.namelist():
@@ -119,36 +119,32 @@ def _setup_minicap(d: adbutils.AdbDevice):
                 d.sync.push(f, dest, mode)
 
     zipfile_path = "stf-binaries.zip"
-    cache_download(
-        "https://github.com/openatx/stf-binaries/archive/0.2.zip",
-        zipfile_path)
+    cache_download("https://github.com/openatx/stf-binaries/archive/0.2.zip",
+                   zipfile_path)
     zip_folder = "stf-binaries-0.2"
 
     sdk = d.getprop("ro.build.version.sdk")  # eg 26
     abi = d.getprop('ro.product.cpu.abi')  # eg arm64-v8a
     abis = (d.getprop('ro.product.cpu.abilist').strip() or abi).split(",")
     # return
-    print("sdk: %s, abi: %s, support-abis: %s" %
-            (sdk, abi, ','.join(abis)))
+    print("sdk: %s, abi: %s, support-abis: %s" % (sdk, abi, ','.join(abis)))
     print("Push minicap+minicap.so to device")
     prefix = zip_folder + "/node_modules/minicap-prebuilt/prebuilt/"
     push_zipfile(prefix + abi + "/lib/android-" + sdk + "/minicap.so",
-                    "/data/local/tmp/minicap.so", 0o644, zipfile_path)
+                 "/data/local/tmp/minicap.so", 0o644, zipfile_path)
     push_zipfile(prefix + abi + "/bin/minicap", "/data/local/tmp/minicap",
-                    0o0755, zipfile_path)
+                 0o0755, zipfile_path)
 
     print("Push minitouch to device")
     prefix = zip_folder + "/node_modules/minitouch-prebuilt/prebuilt/"
-    push_zipfile(prefix + abi + "/bin/minitouch",
-                    "/data/local/tmp/minitouch", 0o0755, zipfile_path)
+    push_zipfile(prefix + abi + "/bin/minitouch", "/data/local/tmp/minitouch",
+                 0o0755, zipfile_path)
 
     # check if minicap installed
-    output = d.shell([
-        "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"
-    ])
+    output = d.shell(
+        ["LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i"])
     print(output)
-    print(
-        "If you see JSON output, it means minicap installed successfully")
+    print("If you see JSON output, it means minicap installed successfully")
 
 
 def main():
@@ -167,7 +163,10 @@ def main():
     parser.add_argument("-i",
                         "--install",
                         help="install from local apk or url")
-    parser.add_argument("--install-confirm", action="store_true", help="auto confirm when install (based on uiautomator2)")
+    parser.add_argument(
+        "--install-confirm",
+        action="store_true",
+        help="auto confirm when install (based on uiautomator2)")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
     parser.add_argument("--qrcode", help="show qrcode of the specified file")
     parser.add_argument("--clear",
@@ -189,7 +188,15 @@ def main():
                         help="install minicap and minitouch to device")
     parser.add_argument("--screenshot", type=str, help="take screenshot")
     parser.add_argument("-b", "--browser", help="open browser in device")
-    parser.add_argument("--push", help="push local to remote, arg is colon seperated, eg some.txt:/sdcard/s.txt")
+    parser.add_argument(
+        "--push",
+        help=
+        "push local to remote, arg is colon seperated, eg some.txt:/sdcard/s.txt"
+    )
+    parser.add_argument(
+        "--pull",
+        help="push local to remote, arg is colon seperated, eg /sdcard/some.txt"
+    )
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -228,7 +235,9 @@ def main():
             qr.add_data(url)
             qr.print_ascii(tty=True)
         except ImportError:
-            print("In order to show QRCode, you need install with: pip3 install qrcode")
+            print(
+                "In order to show QRCode, you need install with: pip3 install qrcode"
+            )
 
         httpd = ThreadingHTTPServer(('', port), SimpleHTTPRequestHandler)
         httpd.serve_forever()
@@ -282,7 +291,7 @@ def main():
                 start = time.time()
                 d.install_remote(dst, clean=True)
                 print("Success installed, time used %d seconds" %
-                    (time.time() - start))
+                      (time.time() - start))
                 break
             except AdbInstallError as e:
                 if i < 2 and e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
@@ -290,8 +299,8 @@ def main():
                     continue
                 sys.exit(
                     "Failure " + e.reason + "\n" +
-                    "Remote apk is not removed. Manually install command:\n\t" +
-                    "adb shell pm install -r -t " + dst)
+                    "Remote apk is not removed. Manually install command:\n\t"
+                    + "adb shell pm install -r -t " + dst)
 
     elif args.uninstall:
         d.shell(["pm", "uninstall", args.uninstall])
@@ -304,18 +313,25 @@ def main():
 
     elif args.screenshot:
         if args.minicap:
-            json_output = d.shell(["LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-i", "2&>/dev/null"]).strip()
+            json_output = d.shell([
+                "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap",
+                "-i", "2&>/dev/null"
+            ]).strip()
             data = json.loads(json_output)
             w, h, r = data["width"], data["height"], data["rotation"]
-            d.shell(["LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap", "-P", "{0}x{1}@{0}x{1}/{2}".format(w, h, r), "-s", ">/sdcard/minicap.jpg"])
+            d.shell([
+                "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap",
+                "-P", "{0}x{1}@{0}x{1}/{2}".format(w, h, r), "-s",
+                ">/sdcard/minicap.jpg"
+            ])
             d.sync.pull("/sdcard/minicap.jpg", args.screenshot)
         else:
             remote_tmp_path = "/data/local/tmp/screenshot.png"
             d.shell(["rm", remote_tmp_path])
             d.shell(["screencap", "-p", remote_tmp_path])
             d.sync.pull(remote_tmp_path, args.screenshot)
-    
-    elif args.minicap: # without args.screenshot
+
+    elif args.minicap:  # without args.screenshot
         _setup_minicap(d)
 
     elif args.push:
@@ -324,6 +340,25 @@ def main():
         with open(local, "rb") as fd:
             r = ReadProgress(fd, length)
             d.sync.push(r, remote, filesize=length)
+
+    elif args.pull:
+        remote_path = args.pull
+        target_path = os.path.basename(remote_path)
+        finfo = d.sync.stat(args.pull)
+
+        if finfo.mode == 0 and finfo.size == 0:
+            sys.exit(f"remote file '{remote_path}' does not exist")
+
+        bytes_so_far = 0
+        for chunk in d.sync.iter_content(remote_path):
+            bytes_so_far += len(chunk)
+            percent = bytes_so_far / finfo.size * 100 if finfo.size != 0 else 100.0
+            print(
+                f"\rDownload to {target_path} ... [{bytes_so_far} / {finfo.size}] %.1f %%"
+                % percent,
+                end="",
+                flush=True)
+        print(f"{remote_path} pulled to {target_path}")
 
     elif args.browser:
         d.open_browser(args.browser)

@@ -27,6 +27,7 @@ _OKAY = "OKAY"
 _FAIL = "FAIL"
 _DENT = "DENT"  # Directory Entity
 _DONE = "DONE"
+_DATA = "DATA"
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
@@ -102,10 +103,8 @@ class _AdbStreamConnection(object):
     def send(self, cmd: str):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
-    def read(self, n: int) -> str:
-        return self.conn.recv(n).decode()
-
     def read_raw(self, n: int) -> bytes:
+        """ read fully """
         t = n
         buffer = b''
         while t > 0:
@@ -115,6 +114,9 @@ class _AdbStreamConnection(object):
             buffer += chunk
             t = n - len(buffer)
         return buffer
+
+    def read(self, n: int) -> str:
+        return self.read_raw(n).decode()
 
     def read_string(self) -> str:
         size = int(self.read(4), 16)
@@ -465,14 +467,20 @@ class Sync():
         with self._prepare_sync(path, "RECV") as c:
             while True:
                 cmd = c.read(4)
-                if cmd == "DONE":
+                if cmd == _FAIL:
+                    str_size = struct.unpack("<I", c.read_raw(4))[0]
+                    error_message = c.read(str_size)
+                    raise AdbError(error_message)
+                elif cmd == _DONE:
                     break
-                assert cmd == "DATA"
-                chunk_size = struct.unpack("<I", c.read_raw(4))[0]
-                chunk = c.read_raw(chunk_size)
-                if len(chunk) != chunk_size:
-                    raise RuntimeError("read chunk missing")
-                yield chunk
+                elif cmd == _DATA:
+                    chunk_size = struct.unpack("<I", c.read_raw(4))[0]
+                    chunk = c.read_raw(chunk_size)
+                    if len(chunk) != chunk_size:
+                        raise RuntimeError("read chunk missing")
+                    yield chunk
+                else:
+                    raise AdbError("Invalid sync cmd", cmd)
 
     def pull(self, src: str, dst: str) -> int:
         """
@@ -490,6 +498,7 @@ class Sync():
 
 
 adb = AdbClient()
+
 # device = adb.device
 # devices = adb.devices
 
