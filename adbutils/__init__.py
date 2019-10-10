@@ -171,7 +171,7 @@ class AdbClient(object):
         """ adb connect $addr
         Returns:
             content adb server returns
-        
+
         Example returns:
             - "already connected to 192.168.190.101:5555"
             - "unable to connect to 192.168.190.101:5551"
@@ -353,7 +353,7 @@ class AdbDevice(ShellMixin):
 
         Returns:
             string of output
-        
+
         Examples:
             shell("ls -l")
             shell(["ls", "-l"])
@@ -432,8 +432,11 @@ class Sync():
                 mode, size, mtime, namelen = struct.unpack(
                     "<IIII", c.conn.recv(16))
                 name = c.read(namelen)
-                yield FileInfo(mode, size,
-                               datetime.datetime.fromtimestamp(mtime), name)
+                try:
+                    mtime = datetime.datetime.fromtimestamp(mtime)
+                except OSError:  # bug in Python 3.6
+                    mtime = datetime.datetime.now()
+                yield FileInfo(mode, size, mtime, name)
 
     def list(self, path: str):
         return list(self.iter_directory(path))
