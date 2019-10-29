@@ -18,11 +18,12 @@ import shutil
 import sys
 import socket
 import time
+import tempfile
 import zipfile
-
 import requests
 
 import adbutils
+import apkutils2
 from adbutils import adb as adbclient
 from adbutils.errors import AdbError, AdbInstallError
 
@@ -46,7 +47,11 @@ def current_ip():
 
 
 class ReadProgress():
-    def __init__(self, r, total_size: int):
+    def __init__(self, r, total_size: int, source_path=None):
+        """
+        Args:
+            source_path (str): store read content to filepath
+        """
         self.r = r
         self.total = total_size
         self.copied = 0
@@ -55,6 +60,8 @@ class ReadProgress():
         self.m = hashlib.md5()
         self._chunk_size = 0
         self._hash = ''
+        self._tmpfd = None if source_path else tempfile.NamedTemporaryFile(suffix=".apk")
+        self._filepath = source_path
 
     def update(self, chunk: bytes):
         chunk_size = len(chunk)
@@ -89,7 +96,15 @@ class ReadProgress():
     def read(self, n: int) -> bytes:
         chunk = self.r.read(n)
         self.update(chunk)
+        if self._tmpfd:
+            self._tmpfd.write(chunk)
         return chunk
+    
+    def filepath(self):
+        if self._filepath:
+            return self._filepath
+        self._tmpfd.seek(0)
+        return self._tmpfd.name
 
 
 def _setup_minicap(d: adbutils.AdbDevice):
@@ -251,21 +266,28 @@ def main():
         return
 
     if args.install:
-        dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
-        print("push to %s" % dst)
         if re.match(r"^https?://", args.install):
             resp = requests.get(args.install, stream=True)
             resp.raise_for_status()
             length = int(resp.headers.get("Content-Length", 0))
             r = ReadProgress(resp.raw, length)
+            print("tmpfile path:", r.filepath())
         else:
             length = os.stat(args.install).st_size
             fd = open(args.install, "rb")
-            r = ReadProgress(fd, length)
+            r = ReadProgress(fd, length, source_path=args.install)
 
+        dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
+        print("push to %s" % dst)
+        
         start = time.time()
         d.sync.push(r, dst)
-        print("Success pushed, time used %d seconds" % (time.time() - start))
+        
+        # parse apk package-name
+        apk = apkutils2.APK(r.filepath())
+        package_name = apk.manifest.package_name
+        print("package name:", package_name)
+        print("success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
         d.shell(["mv", dst, new_dst])
@@ -285,18 +307,26 @@ def main():
             ud.xpath.when("允许").click()
             ud.xpath.when("安装").click()
             ud.xpath.watch_background(2.0)
-
-        for i in range(3):
-            try:
-                start = time.time()
+        
+        try:
+            start = time.time()
+            d.install_remote(dst, clean=True)
+            print("Success installed, time used %d seconds" %
+                (time.time() - start))
+        except AdbInstallError as e:
+            if e.reason in ["INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
+                    "INSTALL_FAILED_UPDATE_INCOMPATIBLE", "INSTALL_FAILED_VERSION_DOWNGRADE"]:
+                print("uninstall %s because %s" % (package_name, e.reason))
+                d.uninstall(package_name)
+                d.install_remote(dst, clean=True)
+                print("Success installed, time used %d seconds" %
+                    (time.time() - start))
+            elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
+                print("Catch error %s, reinstall" % e.reason)
                 d.install_remote(dst, clean=True)
                 print("Success installed, time used %d seconds" %
                       (time.time() - start))
-                break
-            except AdbInstallError as e:
-                if i < 2 and e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
-                    print("Catch error %s, reinstall" % e.reason)
-                    continue
+            else:
                 sys.exit(
                     "Failure " + e.reason + "\n" +
                     "Remote apk is not removed. Manually install command:\n\t"
