@@ -2,7 +2,6 @@ language: python
 python:
 - '3.6'
 - nightly
-- pypy
 script: echo skip test
 deploy:
   skip_existing: true
