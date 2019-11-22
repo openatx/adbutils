@@ -62,6 +62,16 @@ for item in adb.forward_list("8d1f93be"):
     print(item.serial, item.local, item.remote)
     # 8d1f93be tcp:10603 tcp:7912
     # 12345678 tcp:10664 tcp:7912
+
+
+# 监控设备连接 track-devices
+for event in adb.track_devices():
+    print(event.present, event.serial, event.status)
+
+## When plugin two device, output
+# True WWUDU16C22003963 device
+# True bf755cab device
+# False bf755cab device
 ```
 
 ## Run shell command and transfer files
@@ -75,6 +85,15 @@ d = adb.device()
 
 print(d.serial) # 获取序列号
 print(d.shell(["getprop", "ro.serial"])) # 获取Prop信息
+
+# show property
+print(d.prop.name) # output example: surabaya
+d.prop.model
+d.prop.device
+d.prop.get("ro.product.model")
+d.prop.get("ro.product.model", cache=True) # a little faster, use cache data first
+
+
 d.sync.push(io.BytesIO(b"Hello Android"), "/data/local/tmp/hi.txt") # 推送文件
 
 # 读取文件
@@ -88,6 +107,7 @@ d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
 info = d.package_info("com.example.demo")
 if info:
     print(info) # expect {"version_name": "1.2.3", "version_code": "12", "signature": "0xff132"}
+
 ```
 
 ## Extended Functions
