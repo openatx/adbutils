@@ -72,6 +72,8 @@ for event in adb.track_devices():
 # True WWUDU16C22003963 device
 # True bf755cab device
 # False bf755cab device
+
+# When adb-server killed, AdbError will be raised
 ```
 
 ## Run shell command and transfer files

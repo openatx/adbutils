@@ -105,26 +105,30 @@ class _AdbStreamConnection(object):
 
     def read_raw(self, n: int) -> bytes:
         """ read fully 
-        
-        Raises:
-            ConnectionError
         """
         t = n
         buffer = b''
         while t > 0:
             chunk = self.conn.recv(t)
             if not chunk:
-                raise ConnectionError("connection error with adb-server")
-                # break
+                break
             buffer += chunk
             t = n - len(buffer)
         return buffer
 
     def read(self, n: int) -> str:
-        return self.read_raw(n).decode()
+        data = self.read_raw(n).decode()
+        return data
 
     def read_string(self) -> str:
-        size = int(self.read(4), 16)
+        """
+        Raises:
+            AdbError
+        """
+        length = self.read(4)
+        if not length:
+            raise AdbError("connection closed")
+        size = int(length, 16)
         return self.read(size)
 
     def read_until_close(self) -> str:
@@ -231,7 +235,7 @@ class AdbClient(object):
             iter of DeviceEvent 
         
         Raises:
-            ConnectionError when adb-server was killed
+            AdbError when adb-server was killed
         """
         orig_devices = []
 
