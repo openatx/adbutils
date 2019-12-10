@@ -222,26 +222,31 @@ class ShellMixin(object):
             result.append(m.group(1))
         return list(sorted(result))
 
-    def package_info(self, pkg_name: str) -> typing.Union[dict, None]:
+    def package_info(self, package_name: str) -> typing.Union[dict, None]:
         """
         version_code might be empty
 
         Returns:
             None or dict(version_name, version_code, signature)
         """
-        output = self._run(['dumpsys', 'package', pkg_name])
+        output = self._run(['dumpsys', 'package', package_name])
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
         version_name = m.group('name') if m else ""
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
         version_code = m.group('code') if m else ""
         if version_code == "0":
             version_code = ""
-        m = re.search(r'PackageSignatures\{(.*?)\}', output)
+        m = re.search(r'PackageSignatures\{.*?\[(.*)\]\}', output)
         signature = m.group(1) if m else None
         if not version_name and signature is None:
             return None
+        m = re.compile(r"pkgFlags=\[\s*(.*)\s*\]").search(output)
+        pkgflags = m.group(1) if m else ""
+        pkgflags = pkgflags.split()
+
         return dict(version_name=version_name,
                     version_code=version_code,
+                    flags=pkgflags,
                     signature=signature)
 
     def rotation(self) -> int:
