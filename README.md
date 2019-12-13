@@ -217,6 +217,8 @@ $ python -m adbutils -V
 $ python -m adbutils -i some.apk
 # Install apk from URL 通过URL安装apk(带有进度)
 $ python -m adbutils -i http://example.com/some.apk
+# Install and launch (-L or --launch)
+$ python -m adbutils -i http://example.com/some.apk -L
 
 # Uninstall 卸载应用
 $ python -m adbutils -u com.github.example

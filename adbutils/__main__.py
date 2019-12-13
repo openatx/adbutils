@@ -183,6 +183,7 @@ def main():
         action="store_true",
         help="auto confirm when install (based on uiautomator2)")
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
+    parser.add_argument("-L", "--launch", action="store_true", help="launch after install")
     parser.add_argument("--qrcode", help="show qrcode of the specified file")
     parser.add_argument("--clear",
                         action="store_true",
@@ -286,7 +287,9 @@ def main():
         # parse apk package-name
         apk = apkutils2.APK(r.filepath())
         package_name = apk.manifest.package_name
+        main_activity = apk.manifest.main_activity
         print("package name:", package_name)
+        print("main activity:", main_activity)
         print("success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
@@ -303,16 +306,20 @@ def main():
             import uiautomator2 as u2
             ud = u2.connect(args.serial)
             ud.press("home")
-            ud.xpath.when("继续安装").click()
-            ud.xpath.when("允许").click()
-            ud.xpath.when("安装").click()
-            ud.xpath.watch_background(2.0)
+            ud.watcher.when("继续安装").click()
+            ud.watcher.when("允许").click()
+            ud.watcher.when("安装").click()
+            ud.watcher.start(2.0)
         
         try:
             start = time.time()
             d.install_remote(dst, clean=True)
             print("Success installed, time used %d seconds" %
                 (time.time() - start))
+            if args.launch:
+                print("Launch app: %s/%s" % (package_name, main_activity))
+                d.shell(['am', 'start', '-n', package_name+"/"+main_activity])
+
         except AdbInstallError as e:
             if e.reason in ["INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
                     "INSTALL_FAILED_UPDATE_INCOMPATIBLE", "INSTALL_FAILED_VERSION_DOWNGRADE"]:
