@@ -6,6 +6,7 @@ import typing
 import warnings
 from collections import namedtuple
 
+import apkutils2
 from retry import retry
 
 from adbutils.errors import AdbError, AdbInstallError
@@ -19,6 +20,7 @@ WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
 class ShellMixin(object):
     """ provide custom functions for some complex operations """
+
     def _run(self, cmd) -> str:
         return self.shell(cmd)
 
@@ -102,7 +104,7 @@ class ShellMixin(object):
         return self._run(
             ['input', 'swipe', x1, y1, x2, y2,
              str(int(duration * 1000))])
-    
+
     def send_keys(self, text: str):
         """ 
         Type a given text 
@@ -112,12 +114,12 @@ class ShellMixin(object):
         """
         escaped_text = self._escape_special_characters(text)
         return self._run(['input', 'text', escaped_text])
-    
+
     @staticmethod
     def _escape_special_characters(text):
         """
         A helper that escape special characters
-        
+
         Args:
             text: str
         """
@@ -152,7 +154,7 @@ class ShellMixin(object):
                                                 "@":  r"\@",
                                                 "/":  r"\/",
                                                 "_":  r"\_",
-                                                " ":  r"%s", # special
+                                                " ":  r"%s",  # special
                                                 "&":  r"\&"}))
         return escaped
 
@@ -167,16 +169,24 @@ class ShellMixin(object):
         result = self._run(['ifconfig', 'wlan0'])
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
-    def install(self, apk_path: str):
+    def install(self, apk_path: str, force: bool = False):
         """
         sdk = self.getprop('ro.build.version.sdk')
         sdk > 23 support -g
+
+        Args:
+            force (bool): uninstall package before install
 
         Raises:
             AdbInstallError
         """
         dst = "/data/local/tmp/tmp-{}.apk".format(int(time.time() * 1000))
+
         self.sync.push(apk_path, dst)
+        if force:
+            apk = apkutils2.APK(apk_path)
+            package_name = apk.manifest.package_name
+            self.uninstall(package_name)
         self.install_remote(dst, clean=True)
 
     def install_remote(self,
@@ -312,12 +322,11 @@ class ShellMixin(object):
                 "monkey", "-p", package_name, "-c",
                 "android.intent.category.LAUNCHER", "1"
             ])
-    
+
     def app_stop(self, package_name: str):
         """ stop app with "am force-stop"
         """
         self._run(['am', 'force-stop', package_name])
-
 
     def app_clear(self, package_name: str):
         self._run(["pm", "clear", package_name])
@@ -331,7 +340,7 @@ class ShellMixin(object):
     def dump_hierarchy(self):
         """
         uiautomator dump
-        
+
         Returns:
             content of xml
         """
@@ -389,7 +398,6 @@ class ShellMixin(object):
         """ rm device file """
         self.shell(["rm", path])
 
-
     def screenrecord(self, remote_path=None, no_autostart=False):
         """
         Args:
@@ -397,7 +405,7 @@ class ShellMixin(object):
             no_autostart: do not start screenrecord, when call this method
         """
         return _ScreenRecord(self, remote_path, autostart=not no_autostart)
-        
+
 
 class _ScreenRecord():
     def __init__(self, d, remote_path=None, autostart=False):
@@ -418,7 +426,8 @@ class _ScreenRecord():
         if self._started:
             warnings.warn("screenrecord already started", UserWarning)
             return
-        self._stream = self._d.shell(["screenrecord", self._remote_path], stream=True)
+        self._stream = self._d.shell(
+            ["screenrecord", self._remote_path], stream=True)
         self._started = True
 
     def stop(self):
@@ -438,9 +447,9 @@ class _ScreenRecord():
         self.stop()
         self._d.sync.pull(self._remote_path, path)
         self._d.remove(self._remote_path)
-    
-    def close(self): # alias of stop
+
+    def close(self):  # alias of stop
         return self.stop()
-    
-    def close_and_pull(self, path: str): # alias of stop_and_pull
+
+    def close_and_pull(self, path: str):  # alias of stop_and_pull
         return self.stop_and_pull(path=path)
