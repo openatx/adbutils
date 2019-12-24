@@ -331,6 +331,10 @@ class ShellMixin(object):
     def app_clear(self, package_name: str):
         self._run(["pm", "clear", package_name])
 
+    def is_screen_on(self):
+        output = self._run(["dumpsys", "power"])
+        return 'mHoldingDisplaySuspendBlocker=true' in output
+
     def open_browser(self, url: str):
         if not re.match("^https?://", url):
             url = "https://" + url
