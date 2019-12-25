@@ -108,8 +108,12 @@ d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
 # 获取包的信息
 info = d.package_info("com.example.demo")
 if info:
-    print(info) # expect {"version_name": "1.2.3", "version_code": "12", "signature": "0xff132"}
-
+    print(info) 
+	# output example:
+    # {
+	# "version_name": "1.2.3", "version_code": "12", "signature": "0xff132", 
+    # "first_install_time": datetime-object, "last_update_time": datetime-object,
+    # }
 ```
 
 ## Extended Functions

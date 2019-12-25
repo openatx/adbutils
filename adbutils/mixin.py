@@ -4,6 +4,7 @@ import re
 import time
 import typing
 import warnings
+from datetime import datetime
 from collections import namedtuple
 
 import apkutils2
@@ -254,9 +255,18 @@ class ShellMixin(object):
         pkgflags = m.group(1) if m else ""
         pkgflags = pkgflags.split()
 
+        time_regex = r"[-\d]+\s+[:\d]+"
+        m = re.compile(f"firstInstallTime=({time_regex})").search(output)
+        first_install_time = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
+
+        m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
+        last_update_time= datetime.strptime(m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
+
         return dict(version_name=version_name,
                     version_code=version_code,
                     flags=pkgflags,
+                    first_install_time=first_install_time,
+                    last_update_time=last_update_time,
                     signature=signature)
 
     def rotation(self) -> int:
