@@ -132,13 +132,13 @@ class _AdbStreamConnection(object):
         return self.read(size)
 
     def read_until_close(self) -> str:
-        content = ""
+        content = b""
         while True:
-            chunk = self.read(4096)
+            chunk = self.read_raw(4096)
             if not chunk:
                 break
             content += chunk
-        return content
+        return content.decode('utf-8', errors='ignore')
 
     def check_okay(self):
         data = self.read(4)
