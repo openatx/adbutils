@@ -18,10 +18,10 @@ from typing import Union
 import pkg_resources
 import six
 import whichcraft
-from deprecation import deprecated
-
-from adbutils.mixin import ShellMixin
+from adbutils._fetch import download_adb
 from adbutils.errors import AdbError
+from adbutils.mixin import ShellMixin
+from deprecation import deprecated
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -56,7 +56,10 @@ def get_free_port():
 def adb_path():
     path = whichcraft.which("adb")
     if path is None:
-        raise EnvironmentError("Can't find adb, please install adb first")
+        if os.name == "nt": # Windows
+            path = download_adb()
+        else:
+            raise EnvironmentError("Can't find adb, please install adb first")
     return path
 
 
