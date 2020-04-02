@@ -41,22 +41,29 @@ def download_adb() -> str:
     """
     fname = FNAME_PER_PLATFORM[get_platform()]
     url = "https://github.com/openatx/adb-binaries/raw/master/" + fname
-    source_dir = os.path.expandvars("$HOME/.adbutils/bin")
+    homedir = os.path.expanduser('~')
+    bin_dir = os.path.join(homedir, ".adbutils/bin")
 
-    path = pathlib.Path(source_dir).joinpath("adb.exe")
-    if path.exists():
-        return str(path)
+    adb_path = pathlib.Path(bin_dir).joinpath("adb.exe" if os.name == "nt" else "adb")
+    if adb_path.exists():
+        return str(adb_path)
 
     with tempfile.NamedTemporaryFile(suffix=".zip") as tmpf:
         print("Downloading adb binaries", "...", end="")
         with urlopen(url, timeout=5) as f1:
-            shutil.copyfileobj(f1, tmpf)
+            shutil.copyfileobj(f1, tmpf) 
             tmpf.flush()
+            tmpf.seek(0)
         print("done")
-        with zipfile.ZipFile(tmpf.name, "r") as zf:
-            os.makedirs(source_dir, exist_ok=True)
-            zf.extractall(source_dir)
-    return str(path)
+
+        # tmpf.name can't used on windows.
+        # luckly zipfile support file-like object
+        # Ref: https://stackoverflow.com/questions/23212435/permission-denied-to-write-to-my-temporary-file
+        with zipfile.ZipFile(tmpf, "r") as zf:
+            os.makedirs(bin_dir, exist_ok=True)
+            zf.extractall(bin_dir)
+
+    return str(adb_path)
 
 
 # def mirror_download(url: str, storepath: str) -> str:

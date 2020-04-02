@@ -53,6 +53,18 @@ def get_free_port():
         s.close()
 
 
+def _check_server(host: str, port: int) -> bool:
+    """ Returns if server is running """
+    s = socket.socket()
+    try:
+        s.connect((host, port))
+        return True
+    except socket.error as e:
+        return False
+    finally:
+        s.close()
+
+
 def adb_path():
     path = whichcraft.which("adb")
     if path is None:
@@ -64,7 +76,7 @@ def adb_path():
 
 
 class _AdbStreamConnection(object):
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int):
         self.__host = host
         self.__port = port
         self.__conn = None
@@ -178,6 +190,17 @@ class AdbClient(object):
             c.send("host:version")
             c.check_okay()
             return int(c.read_string(), 16)
+
+    def server_kill(self):
+        """
+        adb kill-server
+ 
+        Send host:kill if adb-server is alive
+        """
+        if _check_server(self.__host, self.__port):
+            with self._connect() as c:
+                c.send("host:kill")
+                c.check_okay()
 
     def connect(self, addr: str) -> str:
         """ adb connect $addr
