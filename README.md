@@ -297,5 +297,8 @@ For more usage, please see the code for details.
 - [Awesome ADB](https://github.com/mzlogin/awesome-adb)
 - [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
 
+# Ref
+- <https://github.com/imageio/imageio-ffmpeg/blob/80e37882d0/imageio_ffmpeg/_utils.py>
+
 # LICENSE
 [MIT](LICENSE)

@@ -18,7 +18,7 @@ from typing import Union
 import pkg_resources
 import six
 import whichcraft
-from adbutils._fetch import download_adb
+from adbutils._utils import get_adb_exe
 from adbutils.errors import AdbError
 from adbutils.mixin import ShellMixin
 from deprecation import deprecated
@@ -66,13 +66,7 @@ def _check_server(host: str, port: int) -> bool:
 
 
 def adb_path():
-    path = whichcraft.which("adb")
-    if path is None:
-        if os.name == "nt": # Windows
-            path = download_adb()
-        else:
-            raise EnvironmentError("Can't find adb, please install adb first")
-    return path
+    return get_adb_exe()
 
 
 class _AdbStreamConnection(object):
