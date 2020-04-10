@@ -362,11 +362,17 @@ def main():
 
     elif args.screenshot:
         if args.minicap:
-            json_output = d.shell([
+            def adb_shell(cmd: list):
+                print("Run:", " ".join(["adb", "shell"] + cmd))
+                return d.shell(cmd).strip()
+            json_output = adb_shell([
                 "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap",
                 "-i", "2&>/dev/null"
-            ]).strip()
+            ])
+            if not json_output.startswith("{"):
+                raise RuntimeError("Invalid json format", json_output)
             data = json.loads(json_output)
+            
             w, h, r = data["width"], data["height"], data["rotation"]
             d.shell([
                 "LD_LIBRARY_PATH=/data/local/tmp", "/data/local/tmp/minicap",

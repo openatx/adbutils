@@ -7,8 +7,7 @@ from urllib.request import urlopen
 
 import adbutils
 
-# ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = "."
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIBNAME = "adbutils"
 BINARIES_DIR = os.path.join(ROOT_DIR, "adbutils", "binaries")
 

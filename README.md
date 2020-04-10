@@ -258,6 +258,15 @@ $ python -m adbutils --minicap
 
 # take screenshot with minicap
 $ python -m adbutils --minicap --screenshot screen.jpg # screenshot with minicap
+
+# Show more info for developers
+$ python -m adbutils --dump-info
+==== ADB Info ====
+Path: /usr/local/bin/adb
+Server version: 41
+
+>> List of devices attached
+- 9de75303 picasso Redmi K30 5G
 ```
 
 ### Environment variables
