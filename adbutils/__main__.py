@@ -213,6 +213,7 @@ def main():
         "--pull",
         help="push local to remote, arg is colon seperated, eg /sdcard/some.txt"
     )
+    parser.add_argument("--dump-info", action="store_true", help="dump info for developer")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -259,6 +260,17 @@ def main():
         httpd.serve_forever()
         return
 
+    if args.dump_info:
+        print("==== ADB Info ====")
+        print("Path:", adbutils.adb_path())
+        print("Server version:", adbclient.server_version())
+        print("")
+        print(">> List of devices attached")
+        for d in adbclient.device_list():
+            print("-", d.serial, d.prop.name, d.prop.model)
+        return
+
+    ## Device operation
     d = adbclient.device(args.serial)
 
     if args.shell:

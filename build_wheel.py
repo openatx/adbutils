@@ -12,20 +12,21 @@ ROOT_DIR = "."
 LIBNAME = "adbutils"
 BINARIES_DIR = os.path.join(ROOT_DIR, "adbutils", "binaries")
 
-
 VERSION = adbutils.__version__
 
+ADB_VERSION = "1.0.41"
 FNAMES_PER_PLATFORM = {
-    "win32": ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"]
+    "win32": ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"],
 }
 WHEEL_BUILDS = {
     "py3-none-win32": "win32",
+    "py3-none-win_amd64": "win32",
 }
 
 def copy_binaries(target_dir, platform: str):
     assert os.path.isdir(target_dir)
     
-    base_url = "https://github.com/openatx/adb-binaries/raw/master/1.0.41"
+    base_url = f"https://github.com/openatx/adb-binaries/raw/master/{ADB_VERSION}"
     for fname in FNAMES_PER_PLATFORM[platform]:
         filename = os.path.join(target_dir, fname)
         fileurl = "/".join([base_url, platform, fname])
@@ -122,8 +123,10 @@ def build():
 
 def release():
     """ Release the packages to pypi """
-    username = os.environ.get("PYPI")
-    subprocess.check_call([sys.executable, "-m", "twine", "upload", "dist/*"])
+    username = os.environ["PYPI_USERNAME"]
+    password = os.environ['PYPI_PASSWORD']
+    subprocess.check_call(
+        [sys.executable, "-m", "twine", "upload", "-u", username, '-p', password, "dist/*"])
 
 
 if __name__ == "__main__":

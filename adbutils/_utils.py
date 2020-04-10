@@ -9,7 +9,7 @@ import whichcraft
 def get_adb_exe():
     # 1. find in $PATH
     exe = whichcraft.which("adb")
-    if _is_valid_exe(exe):
+    if exe and _is_valid_exe(exe):
         return exe
     
     # 2. use buildin adb
@@ -43,7 +43,7 @@ def _popen_kwargs(prevent_sigint=False):
     }
 
 
-def _is_valid_exe(exe):
+def _is_valid_exe(exe: str):
     cmd = [exe, "version"]
     try:
         with open(os.devnull, "w") as null:
