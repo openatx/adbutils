@@ -9,7 +9,7 @@ deploy:
   user: codeskyblue
   password:
     secure: Qdf0yMd/Yc4MkPACeEogGrX+X1E47gNl99+iw63Znv7H326l4mOKiioJr6LinJcZNfOhDG/GWuzUqMrtpIgj/SEp2CyTolTk5pClgsxZqH8NzYKnlhIt59loFyO7aFcUtu3wa/RJ5GrTsBQObSYDhlhpTQ++N0Nhb481RfhTvmXnHRUT9dfL7m9VKP9X8ObyLOA1BhaFUwJz6vGomW4+d54dtee3lv2JDMAPveiWLDXAPs+Dh2+GrqwpOwNTuNChc1d8vqKznt3ZYZgWDeuFMQtlHH5A/40UscFS5CbiMVw3xXhYL6HWG6FzgsMTewJx9ZJp372NasPJefYYJ+EPHOsJhODY/uEx4fzK79U13x6K6Fcx71hoMWy0q3UEJjO2fOQshET4YkNZAdDhc9q1QXK75uKhZVFmRaV9sgKVLkJHHxoGOhWdWaB3KhuCCe7dv4JtI9/obrN+ew0lO+Mno5vBEZuz6Hih1Xe21fbATAciU79TJf1OudL1nariuVig7g03mKv/hBWe/4oRiI3mdHlm2yWyaTDb3QRn3wXLS6JW5+qj8TFwMLH7qAihwb4kWqrBm9m8vcsIr3m+/NdoVlhULVMdhNzuhE+FBVNZPlr3U9pkrKuCfSIyfTYfVBvwAnEOQ0HarxWmWKNNc7QewNeRrR5KS7t6Kx90EHDOKiU=
+  distributions: "build_wheel" # default is "sdist"
   on:
     tags: true
-    distributions: "build_wheel" # default is "sdist"
     repo: openatx/adbutils
