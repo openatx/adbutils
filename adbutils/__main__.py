@@ -10,6 +10,7 @@ Commands:
 from __future__ import absolute_import
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -214,6 +215,7 @@ def main():
         help="push local to remote, arg is colon seperated, eg /sdcard/some.txt"
     )
     parser.add_argument("--dump-info", action="store_true", help="dump info for developer")
+    parser.add_argument("--track", action="store_true", help="trace device status")
     parser.add_argument("args", nargs="*", help="arguments")
 
     args = parser.parse_args()
@@ -268,6 +270,12 @@ def main():
         print(">> List of devices attached")
         for d in adbclient.device_list():
             print("-", d.serial, d.prop.name, d.prop.model)
+        return
+    
+    if args.track:
+        for event in adbclient.track_devices():
+            asctime = datetime.datetime.now().strftime("%H:%M:%S.%f")
+            print("{} {} -> {}".format(asctime[:-3], event.serial, event.status))
         return
 
     ## Device operation

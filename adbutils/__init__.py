@@ -13,7 +13,7 @@ import struct
 import subprocess
 from collections import namedtuple
 from contextlib import contextmanager
-from typing import Union
+from typing import Union, Iterator
 
 import pkg_resources
 import six
@@ -244,15 +244,15 @@ class AdbClient(object):
             if not stream:
                 c.close()
     
-    def track_devices(self, limit_status=['device']):
+    def track_devices(self) -> Iterator[DeviceEvent]:
         """
-        track-devices
+        Report device state when changes
 
         Args:
             limit_status: eg, ['device', 'offline'], empty means all status
 
         Returns:
-            iter of DeviceEvent 
+            Iterator[DeviceEvent], DeviceEvent.status can be one of ['device', 'offline', 'unauthorized', 'absent']
         
         Raises:
             AdbError when adb-server was killed
@@ -264,26 +264,24 @@ class AdbClient(object):
             c.check_okay()
             while True:
                 output = c.read_string()
-                curr_devices = self._output2devices(output, limit_status)
+                curr_devices = self._output2devices(output)
                 for event in self._diff_devices(orig_devices, curr_devices):
                     yield event
                 orig_devices = curr_devices
 
-    def _output2devices(self, output: str, limit_status=[]):
+    def _output2devices(self, output: str):
         devices = []
         for line in output.splitlines():
             fields = line.strip().split("\t", maxsplit=1)
             if len(fields) != 2:
                 continue
             serial, status = fields
-            if limit_status and status not in limit_status:
-                continue
             devices.append(DeviceEvent(None, serial, status))
         return devices
 
     def _diff_devices(self, orig: list, curr: list):
         for d in set(orig).difference(curr):
-            yield DeviceEvent(False, d.serial, d.status)
+            yield DeviceEvent(False, d.serial, 'absent')
         for d in set(curr).difference(orig):
             yield DeviceEvent(True, d.serial, d.status)
 

@@ -71,7 +71,7 @@ for event in adb.track_devices():
 ## When plugin two device, output
 # True WWUDU16C22003963 device
 # True bf755cab device
-# False bf755cab device
+# False bf755cab absent
 
 # When adb-server killed, AdbError will be raised
 ```
@@ -267,6 +267,14 @@ Server version: 41
 
 >> List of devices attached
 - 9de75303 picasso Redmi K30 5G
+
+# Track device status, function like: watch adb devices
+$ python -m adbutils --track
+15:09:59.534 08a3d291 -> device
+15:10:02.683 08a3d291 -> absent
+15:10:05.196 08a3d291 -> offline
+15:10:06.545 08a3d291 -> absent
+15:10:06.545 08a3d291 -> device
 ```
 
 ### Environment variables
