@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import struct
 from pkg_resources import resource_filename
 
 import whichcraft

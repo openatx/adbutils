@@ -13,13 +13,13 @@ import struct
 import subprocess
 from collections import namedtuple
 from contextlib import contextmanager
-from typing import Union, Iterator
+from typing import Union, Iterator, Optional
 
 import pkg_resources
 import six
 import whichcraft
 from adbutils._utils import get_adb_exe
-from adbutils.errors import AdbError
+from adbutils.errors import AdbError, AdbTimeout
 from adbutils.mixin import ShellMixin
 from deprecation import deprecated
 
@@ -92,7 +92,7 @@ class _AdbStreamConnection(object):
         try:
             self.__conn = self._create_socket()
         except ConnectionRefusedError:
-            subprocess.run([adb_path(), "start-server"])
+            subprocess.run([adb_path(), "start-server"], timeout=20.0) # 20s should enough for adb start
             self.__conn = self._create_socket()
         return self
 
@@ -213,15 +213,20 @@ class AdbClient(object):
     def shell(self,
               serial: str,
               command: Union[str, list, tuple],
-              stream: bool = False) -> str:
+              stream: bool = False,
+              timeout: Optional[float] = None) -> str:
         """Run shell in android and return output
         Args:
             serial (str)
             command: list, tuple or str
             stream (bool): return stream instead of string output
+            timeout (float or None): only works when stream is False
 
         Returns:
             str or socket
+        
+        Raises:
+            AdbTimeout
         """
         assert isinstance(serial, six.string_types)
         if isinstance(command, (list, tuple)):
@@ -235,7 +240,13 @@ class AdbClient(object):
             c.check_okay()
             if stream:
                 return c
-            return c.read_until_close()
+            
+            # when no response in timeout, socket.timeout will raise
+            c.conn.settimeout(timeout)
+            try:
+                return c.read_until_close()
+            except socket.timeout:
+                raise AdbTimeout("shell exec timeout", "CMD={!r} TIMEOUT={:.1f}".format(command, timeout))
         except:
             if stream:
                 c.close()
@@ -419,15 +430,19 @@ class AdbDevice(ShellMixin):
     def shell(self,
               cmdargs: Union[str, list, tuple],
               stream: bool = False,
+              timeout: Optional[float] = None,
               rstrip=True) -> str:
         """Run shell inside device and get it's content
 
         Args:
             rstrip (bool): strip the last empty line (Default: True)
             stream (bool): return stream instead of string output (Default: False)
+            timeout (float): set shell timeout
 
         Returns:
             string of output
+
+        Raises:
 
         Examples:
             shell("ls -l")
@@ -436,7 +451,7 @@ class AdbDevice(ShellMixin):
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = subprocess.list2cmdline(cmdargs)
-        ret = self._client.shell(self._serial, cmdargs, stream=stream)
+        ret = self._client.shell(self._serial, cmdargs, stream=stream, timeout=timeout)
         if stream:
             return ret
         return ret.rstrip() if rstrip else ret

@@ -76,7 +76,7 @@ for event in adb.track_devices():
 # When adb-server killed, AdbError will be raised
 ```
 
-## Run shell command and transfer files
+## Run shell command
 I assume there is only one device connected.
 
 ```python
@@ -86,16 +86,26 @@ from adbutils import adb
 d = adb.device()
 
 print(d.serial) # 获取序列号
-print(d.shell(["getprop", "ro.serial"])) # 获取Prop信息
 
-# show property
+# Argument support list, str
+serial = d.shell(["getprop", "ro.serial"]) # 获取Prop信息
+
+# Same as
+serial = d.shell("getprop ro.serial")
+
+# Set timeout for shell command
+d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
+
+# show property, also based on d.shell
 print(d.prop.name) # output example: surabaya
 d.prop.model
 d.prop.device
 d.prop.get("ro.product.model")
 d.prop.get("ro.product.model", cache=True) # a little faster, use cache data first
+```
 
-
+## Transfer files
+```python
 d.sync.push(io.BytesIO(b"Hello Android"), "/data/local/tmp/hi.txt") # 推送文件
 
 # 读取文件

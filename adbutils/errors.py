@@ -4,6 +4,10 @@ import re
 class AdbError(Exception):
     """ adb error """
 
+
+class AdbTimeout(AdbError):
+    """ timeout when communicate to adb-server """
+
 class AdbInstallError(AdbError):
     def __init__(self, output: str):
         """
