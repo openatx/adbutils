@@ -308,11 +308,13 @@ def main():
         apk = apkutils2.APK(r.filepath())
         package_name = apk.manifest.package_name
         main_activity = apk.manifest.main_activity
-        print("package name:", package_name)
-        print("main activity:", main_activity)
+        version_name = apk.manifest.version_name
+        print("packageName:", package_name)
+        print("mainActivity:", main_activity)
+        print("apkVersion: {}".format(version_name))
         print("success pushed, time used %d seconds" % (time.time() - start))
 
-        new_dst = "/data/local/tmp/tmp-%s.apk" % r._hash[:8]
+        new_dst = "/data/local/tmp/{}-{}.apk".format(package_name, version_name)
         d.shell(["mv", dst, new_dst])
         dst = new_dst
         info = d.sync.stat(dst)
