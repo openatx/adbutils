@@ -35,6 +35,7 @@ _DISPLAY_RE = re.compile(
 
 DeviceEvent = namedtuple('DeviceEvent', ['present', 'serial', 'status'])
 ForwardItem = namedtuple("ForwardItem", ["serial", "local", "remote"])
+ReverseItem = namedtuple("ReverseItem", ["remote", "local"])
 FileInfo = namedtuple("FileInfo", ['mode', 'size', 'mtime', 'name'])
 WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
@@ -92,7 +93,7 @@ class _AdbStreamConnection(object):
         try:
             self.__conn = self._create_socket()
         except ConnectionRefusedError:
-            subprocess.run([adb_path(), "start-server"], timeout=20.0) # 20s should enough for adb start
+            subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             self.__conn = self._create_socket()
         return self
 
@@ -113,7 +114,7 @@ class _AdbStreamConnection(object):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
     def read_raw(self, n: int) -> bytes:
-        """ read fully 
+        """ read fully
         """
         t = n
         buffer = b''
@@ -188,7 +189,7 @@ class AdbClient(object):
     def server_kill(self):
         """
         adb kill-server
- 
+
         Send host:kill if adb-server is alive
         """
         if _check_server(self.__host, self.__port):
@@ -224,7 +225,7 @@ class AdbClient(object):
 
         Returns:
             str or socket
-        
+
         Raises:
             AdbTimeout
         """
@@ -240,7 +241,7 @@ class AdbClient(object):
             c.check_okay()
             if stream:
                 return c
-            
+
             # when no response in timeout, socket.timeout will raise
             c.conn.settimeout(timeout)
             try:
@@ -254,7 +255,7 @@ class AdbClient(object):
         finally:
             if not stream:
                 c.close()
-    
+
     def track_devices(self) -> Iterator[DeviceEvent]:
         """
         Report device state when changes
@@ -264,7 +265,7 @@ class AdbClient(object):
 
         Returns:
             Iterator[DeviceEvent], DeviceEvent.status can be one of ['device', 'offline', 'unauthorized', 'absent']
-        
+
         Raises:
             AdbError when adb-server was killed
         """
@@ -330,6 +331,36 @@ class AdbClient(object):
             c.send(":".join(cmds))
             c.check_okay()
 
+    def reverse(self, serial, remote, local, norebind=False):
+        """
+        Args:
+            serial (str): device serial
+            remote, local (str): tcp:<port> or localabstract:<name>
+            norebind (bool): fail if already reversed when set to true
+
+        Raises:
+            AdbError
+        """
+        with self._connect() as c:
+            c.send("host:transport:" + serial)
+            c.check_okay()
+            cmds = ['reverse:forward', remote + ";" + local]
+            c.send(":".join(cmds))
+            c.check_okay()
+
+    def reverse_list(self, serial: Union[None, str] = None):
+        with self._connect() as c:
+            c.send("host:transport:" + serial)
+            c.check_okay()
+            c.send("reverse:list-forward")
+            c.check_okay()
+            content = c.read_string()
+            for line in content.splitlines():
+                parts = line.split()
+                if len(parts) != 3:
+                    continue
+                yield ReverseItem(*parts[1:])
+
     def iter_device(self):
         """
         Returns:
@@ -386,7 +417,7 @@ class AdbDevice(ShellMixin):
     def __init__(self, client: AdbClient, serial: str):
         self._client = client
         self._serial = serial
-        self._properties = {} # store properties data
+        self._properties = {}  # store properties data
 
     @property
     def serial(self):
@@ -480,6 +511,12 @@ class AdbDevice(ShellMixin):
 
     def forward_list(self):
         return self._client.forward_list(self._serial)
+
+    def reverse(self, remote: str, local: str):
+        return self._client.reverse(self._serial, remote, local)
+
+    def reverse_list(self):
+        return self._client.reverse_list(self._serial)
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
