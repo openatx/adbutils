@@ -284,6 +284,8 @@ class ShellMixin(object):
         output = self.shell(
             'LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/minicap -i')
         try:
+            if output.startswith('INFO:'):
+                output = output[output.index('{'):]
             data = json.loads(output)
             return data['rotation'] / 90
         except ValueError:
