@@ -361,6 +361,17 @@ class AdbClient(object):
                     continue
                 yield ReverseItem(*parts[1:])
 
+    def open_local(self, serial: str, path, mode='wb'):
+        c = self._connect()
+        c.send("host:transport:" + serial)
+        c.check_okay()
+        if path.startswith('localabstract:') or path.startswith('localfilesystem:'):
+            c.send(path)
+        else:
+            c.send('localfilesystem:' + path)
+        c.check_okay()
+        return c.conn.makefile(mode)
+
     def iter_device(self):
         """
         Returns:
@@ -517,6 +528,9 @@ class AdbDevice(ShellMixin):
 
     def reverse_list(self):
         return self._client.reverse_list(self._serial)
+
+    def open_local(self, path, mode='wb'):
+        return self._client.open_local(self._serial, path, mode)
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
