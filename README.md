@@ -47,8 +47,8 @@ print(output)
 # output: already connected to 127.0.0.1:5555
 ```
 
-## List forward
-Same as `adb forward --list`
+## adb forward and adb reverse
+Same as `adb forward --list` and `adb reverse --list`
 
 ```python
 # list all forwards
@@ -63,6 +63,9 @@ for item in adb.forward_list("8d1f93be"):
     # 8d1f93be tcp:10603 tcp:7912
     # 12345678 tcp:10664 tcp:7912
 
+
+for item in adb.reverse_list():
+    print(item.serial, item.local, item.remote)
 
 # 监控设备连接 track-devices
 for event in adb.track_devices():
