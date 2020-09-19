@@ -4,6 +4,8 @@ import re
 class AdbError(Exception):
     """ adb error """
 
+class AdbConnectError(AdbError):
+    """ cannot connect to the device """
 
 class AdbTimeout(AdbError):
     """ timeout when communicate to adb-server """

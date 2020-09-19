@@ -19,7 +19,7 @@ import pkg_resources
 import six
 import whichcraft
 from adbutils._utils import get_adb_exe
-from adbutils.errors import AdbError, AdbTimeout
+from adbutils.errors import AdbError, AdbTimeout, AdbConnectError
 from adbutils.mixin import ShellMixin
 from deprecation import deprecated
 
@@ -205,11 +205,18 @@ class AdbClient(object):
         Example returns:
             - "already connected to 192.168.190.101:5555"
             - "unable to connect to 192.168.190.101:5551"
+
+        Raises:
+            AdbConnectError
         """
         with self._connect() as c:
             c.send("host:connect:" + addr)
             c.check_okay()
-            return c.read_string()
+            output = c.read_string()
+            if "cannot" in output:
+                raise AdbConnectError(output)
+            else:
+                return output
 
     def shell(self,
               serial: str,
