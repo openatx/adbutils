@@ -199,7 +199,7 @@ d.sync.pull("/sdcard/s.mp4", "s.mp4") # pulling video
 
 ## Develop
 ```sh
-git clone https://github.com/openatx/adbutils adbutils
+git clone https://github.com/openatx/adbutils.git
 pip install -e adbutils # install as development mode
 ```
 
