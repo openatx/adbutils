@@ -325,13 +325,16 @@ def main():
         print("install to android system ...")
         if args.install_confirm:
             # Beta
-            import uiautomator2 as u2
-            ud = u2.connect(args.serial)
-            ud.press("home")
-            ud.watcher.when("继续安装").click()
-            ud.watcher.when("允许").click()
-            ud.watcher.when("安装").click()
-            ud.watcher.start(2.0)
+            try:
+                import uiautomator2 as u2
+                ud = u2.connect(args.serial)
+                ud.press("home")
+                ud.watcher.when("继续安装").click()
+                ud.watcher.when("允许").click()
+                ud.watcher.when("安装").click()
+                ud.watcher.start(2.0)
+            except Exception as e:
+                print("WARNING: Uiautomator2 prepare failed", e)
         
         try:
             start = time.time()
@@ -350,6 +353,9 @@ def main():
                 d.install_remote(dst, clean=True)
                 print("Success installed, time used %d seconds" %
                     (time.time() - start))
+                if args.launch:
+                    print("Launch app: %s/%s" % (package_name, main_activity))
+                    d.shell(['am', 'start', '-n', package_name+"/"+main_activity])
             elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
                 print("Catch error %s, reinstall" % e.reason)
                 d.install_remote(dst, clean=True)
