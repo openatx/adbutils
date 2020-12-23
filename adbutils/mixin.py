@@ -13,7 +13,7 @@ from retry import retry
 from adbutils.errors import AdbError, AdbInstallError
 
 _DISPLAY_RE = re.compile(
-    r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
+    r'.*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
 
 WindowSize = namedtuple("WindowSize", ['width', 'height'])
