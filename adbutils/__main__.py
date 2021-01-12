@@ -332,7 +332,7 @@ def main():
                 import uiautomator2 as u2
                 ud = u2.connect(args.serial)
                 ud.press("home")
-                ud.watch_context() as ctx:
+                with ud.watch_context() as ctx:
                     ctx.when("允许").click()
                     ctx.when("继续安装").click()
                     ctx.when("安装").click()
@@ -354,6 +354,9 @@ def main():
                 d.install_remote(dst, clean=True)
                 print("Success installed, time used %d seconds" %
                     (time.time() - start))
+                if args.launch:
+                    print("Launch app: %s/%s" % (package_name, main_activity))
+                    d.shell(['am', 'start', '-n', package_name+"/"+main_activity])
             elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
                 print("Catch error %s, reinstall" % e.reason)
                 d.install_remote(dst, clean=True)
