@@ -437,7 +437,7 @@ def main():
 
     elif args.package:
         info = d.package_info(args.package)
-        print(json.dumps(info, indent=4))
+        print(json.dumps(info, indent=4, default=str))
 
 
 if __name__ == "__main__":
