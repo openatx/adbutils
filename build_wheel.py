@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # coding: utf-8
 import os
 import shutil
@@ -13,10 +14,15 @@ BINARIES_DIR = os.path.join(ROOT_DIR, "adbutils", "binaries")
 ADB_VERSION = "1.0.41"
 FNAMES_PER_PLATFORM = {
     "win32": ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"],
+    "osx64": ["adb"],
 }
+
+osxplats = "macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64"
+
 WHEEL_BUILDS = {
     "py3-none-win32": "win32",
     "py3-none-win_amd64": "win32",
+    "py3-none-" + osxplats: "osx64",
 }
 
 def copy_binaries(target_dir, platform: str):
@@ -27,10 +33,12 @@ def copy_binaries(target_dir, platform: str):
         filename = os.path.join(target_dir, fname)
         fileurl = "/".join([base_url, platform, fname])
         
-        print("Downloading", filename, "...", end=" ")
+        print("Downloading", fileurl, "...", end=" ", flush=True)
         with urlopen(fileurl, timeout=5) as f1:
             with open(filename, "wb") as f2:
                 shutil.copyfileobj(f1, f2)
+            if fname == "adb":
+                os.chmod(filename, 0o755)
         print("done")
 
 # copy_binaries(os.path.join(ROOT_DIR, "adbutils", "binaries"), "win32")
@@ -99,8 +107,11 @@ def build():
     # Build for different platforms
     for wheeltag, platform in WHEEL_BUILDS.items():
         print(f"Edit for {platform} {wheeltag}")
-        print(os.path.join(distdir, packdir, LIBNAME, "binaries"))
-        copy_binaries(os.path.join(distdir, packdir, LIBNAME, "binaries"), platform)
+
+        # copy binaries
+        binary_dir = os.path.join(distdir, packdir, LIBNAME, "binaries")
+        clear_binaries_dir(binary_dir)
+        copy_binaries(binary_dir, platform)
         
         lines = []
         for line in open(wheelfile, "r", encoding="UTF-8"):
