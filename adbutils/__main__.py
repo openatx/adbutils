@@ -312,7 +312,7 @@ def main():
         print("packageName:", package_name)
         print("mainActivity:", main_activity)
         print("apkVersion: {}".format(version_name))
-        print("success pushed, time used %d seconds" % (time.time() - start))
+        print("Success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/{}-{}.apk".format(package_name, version_name)
         d.shell(["mv", dst, new_dst])
@@ -322,23 +322,24 @@ def main():
               (r._hash, humanize(info.size)))
         assert info.size == r.copied
 
+        print("Uninstall app first")
+        d.shell(['pm', 'uninstall', package_name])
+
         print("install to android system ...")
-        if args.install_confirm:
-            # Beta
-            try:
+        try:
+            start = time.time()
+            if args.install_confirm:
                 import uiautomator2 as u2
                 ud = u2.connect(args.serial)
                 ud.press("home")
-                ud.watcher.when("继续安装").click()
-                ud.watcher.when("允许").click()
-                ud.watcher.when("安装").click()
-                ud.watcher.start(2.0)
-            except Exception as e:
-                print("WARNING: Uiautomator2 prepare failed", e)
-        
-        try:
-            start = time.time()
-            d.install_remote(dst, clean=True)
+                with ud.watch_context() as ctx:
+                    ctx.when("允许").click()
+                    ctx.when("继续安装").click()
+                    ctx.when("安装").click()
+
+                    d.install_remote(dst, clean=True)
+            else:
+                d.install_remote(dst, clean=True)
             print("Success installed, time used %d seconds" %
                 (time.time() - start))
             if args.launch:
@@ -436,7 +437,7 @@ def main():
 
     elif args.package:
         info = d.package_info(args.package)
-        print(json.dumps(info, indent=4))
+        print(json.dumps(info, indent=4, default=str))
 
 
 if __name__ == "__main__":

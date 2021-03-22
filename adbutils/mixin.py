@@ -262,7 +262,8 @@ class ShellMixin(object):
         m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
         last_update_time= datetime.strptime(m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
 
-        return dict(version_name=version_name,
+        return dict(package_name=package_name,
+                    version_name=version_name,
                     version_code=version_code,
                     flags=pkgflags,
                     first_install_time=first_install_time,
