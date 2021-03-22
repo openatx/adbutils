@@ -1,8 +1,10 @@
 # coding: utf-8
 #
+import time
+import adbutils
 
 
-def test_reverse(device):
+def test_reverse(device: adbutils.AdbDevice):
     """
     Test commands:
     
@@ -12,6 +14,6 @@ def test_reverse(device):
     device.reverse("tcp:12345", "tcp:4000")
     exists = False
     for item in device.reverse_list():
-        if item.local == "tcp:12345" and item.remote == "tcp:4000":
+        if item.remote == "tcp:12345" and item.local == "tcp:4000":
             exists = True
     assert exists

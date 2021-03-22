@@ -74,9 +74,7 @@ class _AdbStreamConnection(object):
     def __init__(self, host: str, port: int):
         self.__host = host
         self.__port = port
-        self.__conn = None
-
-        self._connect()
+        self.__conn = self._safe_connect()
 
     def _create_socket(self):
         adb_host = self.__host
@@ -89,13 +87,12 @@ class _AdbStreamConnection(object):
             s.close()
             raise
 
-    def _connect(self):
+    def _safe_connect(self):
         try:
-            self.__conn = self._create_socket()
+            return self._create_socket()
         except ConnectionRefusedError:
             subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
-            self.__conn = self._create_socket()
-        return self
+            return self._create_socket()
 
     def close(self):
         self.__conn.close()
@@ -110,10 +107,7 @@ class _AdbStreamConnection(object):
     def conn(self):
         return self.__conn
 
-    def send(self, cmd: str):
-        self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
-
-    def read_raw(self, n: int) -> bytes:
+    def read(self, n: int) -> bytes:
         """ read fully
         """
         t = n
@@ -125,35 +119,38 @@ class _AdbStreamConnection(object):
             buffer += chunk
             t = n - len(buffer)
         return buffer
+        
+    def send_command(self, cmd: str):
+        self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
-    def read(self, n: int) -> str:
-        data = self.read_raw(n).decode()
+    def read_string(self, n: int) -> str:
+        data = self.read(n).decode()
         return data
 
-    def read_string(self) -> str:
+    def read_string_block(self) -> str:
         """
         Raises:
             AdbError
         """
-        length = self.read(4)
+        length = self.read_string(4)
         if not length:
             raise AdbError("connection closed")
         size = int(length, 16)
-        return self.read(size)
+        return self.read_string(size)
 
     def read_until_close(self) -> str:
         content = b""
         while True:
-            chunk = self.read_raw(4096)
+            chunk = self.read(4096)
             if not chunk:
                 break
             content += chunk
         return content.decode('utf-8', errors='ignore')
 
     def check_okay(self):
-        data = self.read(4)
+        data = self.read_string(4)
         if data == _FAIL:
-            raise AdbError(self.read_string())
+            raise AdbError(self.read_string_block())
         elif data == _OKAY:
             return
         raise AdbError("Unknown data: %s" % data)
@@ -182,9 +179,9 @@ class AdbClient(object):
             int
         """
         with self._connect() as c:
-            c.send("host:version")
+            c.send_command("host:version")
             c.check_okay()
-            return int(c.read_string(), 16)
+            return int(c.read_string_block(), 16)
 
     def server_kill(self):
         """
@@ -194,7 +191,7 @@ class AdbClient(object):
         """
         if _check_server(self.__host, self.__port):
             with self._connect() as c:
-                c.send("host:kill")
+                c.send_command("host:kill")
                 c.check_okay()
 
     def connect(self, addr: str) -> str:
@@ -207,9 +204,9 @@ class AdbClient(object):
             - "unable to connect to 192.168.190.101:5551"
         """
         with self._connect() as c:
-            c.send("host:connect:" + addr)
+            c.send_command("host:connect:" + addr)
             c.check_okay()
-            return c.read_string()
+            return c.read_string_block()
 
     def shell(self,
               serial: str,
@@ -235,9 +232,9 @@ class AdbClient(object):
         assert isinstance(command, six.string_types)
         c = self._connect()
         try:
-            c.send("host:transport:" + serial)
+            c.send_command("host:transport:" + serial)
             c.check_okay()
-            c.send("shell:" + command)
+            c.send_command("shell:" + command)
             c.check_okay()
             if stream:
                 return c
@@ -272,10 +269,10 @@ class AdbClient(object):
         orig_devices = []
 
         with self._connect() as c:
-            c.send("host:track-devices")
+            c.send_command("host:track-devices")
             c.check_okay()
             while True:
-                output = c.read_string()
+                output = c.read_string_block()
                 curr_devices = self._output2devices(output)
                 for event in self._diff_devices(orig_devices, curr_devices):
                     yield event
@@ -302,9 +299,9 @@ class AdbClient(object):
             list_cmd = "host:list-forward"
             if serial:
                 list_cmd = "host-serial:{}:list-forward".format(serial)
-            c.send(list_cmd)
+            c.send_command(list_cmd)
             c.check_okay()
-            content = c.read_string()
+            content = c.read_string_block()
             for line in content.splitlines():
                 parts = line.split()
                 if len(parts) != 3:
@@ -328,7 +325,7 @@ class AdbClient(object):
             if norebind:
                 cmds.append("norebind")
             cmds.append(local + ";" + remote)
-            c.send(":".join(cmds))
+            c.send_command(":".join(cmds))
             c.check_okay()
 
     def reverse(self, serial, remote, local, norebind=False):
@@ -342,19 +339,19 @@ class AdbClient(object):
             AdbError
         """
         with self._connect() as c:
-            c.send("host:transport:" + serial)
+            c.send_command("host:transport:" + serial)
             c.check_okay()
             cmds = ['reverse:forward', remote + ";" + local]
-            c.send(":".join(cmds))
+            c.send_command(":".join(cmds))
             c.check_okay()
 
     def reverse_list(self, serial: Union[None, str] = None):
         with self._connect() as c:
-            c.send("host:transport:" + serial)
+            c.send_command("host:transport:" + serial)
             c.check_okay()
-            c.send("reverse:list-forward")
+            c.send_command("reverse:list-forward")
             c.check_okay()
-            content = c.read_string()
+            content = c.read_string_block()
             for line in content.splitlines():
                 parts = line.split()
                 if len(parts) != 3:
@@ -367,9 +364,9 @@ class AdbClient(object):
             iter of AdbDevice
         """
         with self._connect() as c:
-            c.send("host:devices")
+            c.send_command("host:devices")
             c.check_okay()
-            output = c.read_string()
+            output = c.read_string_block()
             for line in output.splitlines():
                 parts = line.strip().split("\t")
                 if len(parts) != 2:
@@ -531,9 +528,9 @@ class Sync():
     def _prepare_sync(self, path, cmd):
         c = self._adbclient._connect()
         try:
-            c.send(":".join(["host", "transport", self._serial]))
+            c.send_command(":".join(["host", "transport", self._serial]))
             c.check_okay()
-            c.send("sync:")
+            c.send_command("sync:")
             c.check_okay()
             # {COMMAND}{LittleEndianPathLength}{Path}
             c.conn.send(
@@ -545,7 +542,7 @@ class Sync():
 
     def stat(self, path: str) -> FileInfo:
         with self._prepare_sync(path, "STAT") as c:
-            assert "STAT" == c.read(4)
+            assert "STAT" == c.read_string(4)
             mode, size, mtime = struct.unpack("<III", c.conn.recv(12))
             return FileInfo(mode, size, datetime.datetime.fromtimestamp(mtime),
                             path)
@@ -553,12 +550,12 @@ class Sync():
     def iter_directory(self, path: str):
         with self._prepare_sync(path, "LIST") as c:
             while 1:
-                response = c.read(4)
+                response = c.read_string(4)
                 if response == _DONE:
                     break
                 mode, size, mtime, namelen = struct.unpack(
                     "<IIII", c.conn.recv(16))
-                name = c.read(namelen)
+                name = c.read_string(namelen)
                 try:
                     mtime = datetime.datetime.fromtimestamp(mtime)
                 except OSError:  # bug in Python 3.6
@@ -585,7 +582,7 @@ class Sync():
                     c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
                     c.conn.send(chunk)
                     total_size += len(chunk)
-                assert c.read(4) == _OKAY
+                assert c.read_string(4) == _OKAY
             finally:
                 if hasattr(r, "close"):
                     r.close()
@@ -596,16 +593,16 @@ class Sync():
     def iter_content(self, path: str):
         with self._prepare_sync(path, "RECV") as c:
             while True:
-                cmd = c.read(4)
+                cmd = c.read_string(4)
                 if cmd == _FAIL:
-                    str_size = struct.unpack("<I", c.read_raw(4))[0]
-                    error_message = c.read(str_size)
+                    str_size = struct.unpack("<I", c.read(4))[0]
+                    error_message = c.read_string(str_size)
                     raise AdbError(error_message)
                 elif cmd == _DONE:
                     break
                 elif cmd == _DATA:
-                    chunk_size = struct.unpack("<I", c.read_raw(4))[0]
-                    chunk = c.read_raw(chunk_size)
+                    chunk_size = struct.unpack("<I", c.read(4))[0]
+                    chunk = c.read(chunk_size)
                     if len(chunk) != chunk_size:
                         raise RuntimeError("read chunk missing")
                     yield chunk

@@ -197,6 +197,19 @@ print("Video total time is about", time.time() - start)
 d.sync.pull("/sdcard/s.mp4", "s.mp4") # pulling video
 ```
 
+Reading Logcat
+
+```python
+d.shell("logcat --clear")
+stream = d.shell("logcat", stream=True)
+with stream:
+    f = stream.conn.makefile()
+    for _ in range(100): # read 100 lines
+        line = f.readline()
+        print("Logcat:", line.rstrip())
+    f.close()
+```
+
 ## Develop
 ```sh
 git clone https://github.com/openatx/adbutils adbutils
