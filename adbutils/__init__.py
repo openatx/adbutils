@@ -207,6 +207,20 @@ class AdbClient(object):
             c.check_okay()
             return c.read_string_block()
 
+    def disconnect(self, addr: str) -> str:
+        """ adb disconnect $addr
+        Returns:
+            content adb server returns
+
+        Example returns:
+            - "disconnected 192.168.190.101:5555"
+        """
+
+        with self._connect() as c:
+            c.send("host:disconnect:" + addr)
+            c.check_okay()
+            return c.read_string()
+
     def shell(self,
               serial: str,
               command: Union[str, list, tuple],
