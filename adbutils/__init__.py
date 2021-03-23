@@ -244,6 +244,8 @@ class AdbClient(object):
             command = subprocess.list2cmdline(command)
         assert isinstance(command, six.string_types)
         c = self._connect()
+        # when no response in timeout, socket.timeout will raise
+        c.conn.settimeout(timeout)
         try:
             c.send_command("host:transport:" + serial)
             c.check_okay()
@@ -251,9 +253,6 @@ class AdbClient(object):
             c.check_okay()
             if stream:
                 return c
-
-            # when no response in timeout, socket.timeout will raise
-            c.conn.settimeout(timeout)
             try:
                 return c.read_until_close()
             except socket.timeout:
