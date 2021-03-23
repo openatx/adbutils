@@ -217,9 +217,9 @@ class AdbClient(object):
         """
 
         with self._connect() as c:
-            c.send("host:disconnect:" + addr)
+            c.send_command("host:disconnect:" + addr)
             c.check_okay()
-            return c.read_string()
+            return c.read_string_block()
 
     def shell(self,
               serial: str,
