@@ -6,7 +6,7 @@ Python adb library for adb service (Only support Python3.6+)
 
 # Install
 ```
-pip install adbutils
+pip3 install adbutils
 ```
 
 # Usage
@@ -136,6 +136,11 @@ AdbUtils provided some custom functions for some complex operations.
 You can use it like this:
 
 ```python
+# install apk
+d.install("apidemo.apk") # use local path
+d.install("http://example.com/apidemo.apk") # install from url
+# raise AdbInstallError if something went wrong
+
 # simulate click
 d.click(100, 100)
 
@@ -213,7 +218,7 @@ with stream:
 ## Develop
 ```sh
 git clone https://github.com/openatx/adbutils adbutils
-pip install -e adbutils # install as development mode
+pip3 install -e adbutils # install as development mode
 ```
 
 Now you can edit code in `adbutils` and test with
@@ -229,7 +234,7 @@ Run tests requires one device connected to your computer
 # change to repo directory
 cd adbutils
 
-pip install pytest
+pip3 install pytest
 pytest tests/
 ```
 

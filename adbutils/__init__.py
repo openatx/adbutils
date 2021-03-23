@@ -17,7 +17,6 @@ from typing import Union, Iterator, Optional
 
 import pkg_resources
 import six
-import whichcraft
 from adbutils._utils import get_adb_exe
 from adbutils.errors import AdbError, AdbTimeout
 from adbutils.mixin import ShellMixin
@@ -651,6 +650,7 @@ class Property():
 
 
 adb = AdbClient()
+device = adb.device
 
 # device = adb.device
 # devices = adb.devices

@@ -11,101 +11,24 @@ from __future__ import absolute_import
 
 import argparse
 import datetime
-import hashlib
+import functools
 import json
 import os
 import re
 import shutil
-import sys
 import socket
+import sys
 import time
-import tempfile
 import zipfile
+
+import apkutils2
 import requests
 
 import adbutils
-import apkutils2
 from adbutils import adb as adbclient
+from adbutils._utils import ReadProgress, current_ip, humanize
 from adbutils.errors import AdbError, AdbInstallError
 
-MB = 1024 * 1024
-
-
-def humanize(n: int) -> str:
-    return '%.1f MB' % (float(n) / MB)
-
-
-def current_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        return ip
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        s.close()
-
-
-class ReadProgress():
-    def __init__(self, r, total_size: int, source_path=None):
-        """
-        Args:
-            source_path (str): store read content to filepath
-        """
-        self.r = r
-        self.total = total_size
-        self.copied = 0
-        self.start_time = time.time()
-        self.update_time = time.time()
-        self.m = hashlib.md5()
-        self._chunk_size = 0
-        self._hash = ''
-        self._tmpfd = None if source_path else tempfile.NamedTemporaryFile(suffix=".apk")
-        self._filepath = source_path
-
-    def update(self, chunk: bytes):
-        chunk_size = len(chunk)
-        self.m.update(chunk)
-        if chunk_size == 0:
-            self._hash = self.m.hexdigest()
-        self.copied += chunk_size
-        self._chunk_size += chunk_size
-
-        if self.total:
-            percent = float(self.copied) / self.total * 100
-        else:
-            percent = 0.0 if chunk_size else 100.0
-
-        p = int(percent)
-        duration = time.time() - self.update_time
-        if p == 100.0 or duration > 1.0:
-            if duration:
-                speed = humanize(self._chunk_size / duration) + "/s"
-            else:
-                copytime = time.time() - self.start_time
-                speed = humanize(self.copied / copytime) + "/s"
-
-            self.update_time = time.time()
-            self._chunk_size = 0
-
-            copysize = humanize(self.copied)
-            totalsize = humanize(self.total)
-            print("{:.1f}%\t{} [{}/{}]".format(percent, speed, copysize,
-                                               totalsize))
-
-    def read(self, n: int) -> bytes:
-        chunk = self.r.read(n)
-        self.update(chunk)
-        if self._tmpfd:
-            self._tmpfd.write(chunk)
-        return chunk
-    
-    def filepath(self):
-        if self._filepath:
-            return self._filepath
-        self._tmpfd.seek(0)
-        return self._tmpfd.name
 
 
 def _setup_minicap(d: adbutils.AdbDevice):
@@ -241,8 +164,7 @@ def main():
         return
 
     if args.qrcode:
-        from http.server import ThreadingHTTPServer
-        from http.server import SimpleHTTPRequestHandler
+        from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
         filename = args.qrcode
         port = 8000
@@ -287,89 +209,31 @@ def main():
         return
 
     if args.install:
-        if re.match(r"^https?://", args.install):
-            resp = requests.get(args.install, stream=True)
-            resp.raise_for_status()
-            length = int(resp.headers.get("Content-Length", 0))
-            r = ReadProgress(resp.raw, length)
-            print("tmpfile path:", r.filepath())
-        else:
-            length = os.stat(args.install).st_size
-            fd = open(args.install, "rb")
-            r = ReadProgress(fd, length, source_path=args.install)
-
-        dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
-        print("push to %s" % dst)
-        
-        start = time.time()
-        d.sync.push(r, dst)
-        
-        # parse apk package-name
-        apk = apkutils2.APK(r.filepath())
-        package_name = apk.manifest.package_name
-        main_activity = apk.manifest.main_activity
-        version_name = apk.manifest.version_name
-        print("packageName:", package_name)
-        print("mainActivity:", main_activity)
-        print("apkVersion: {}".format(version_name))
-        print("Success pushed, time used %d seconds" % (time.time() - start))
-
-        new_dst = "/data/local/tmp/{}-{}.apk".format(package_name, version_name)
-        d.shell(["mv", dst, new_dst])
-        dst = new_dst
-        info = d.sync.stat(dst)
-        print("verify pushed apk, md5: %s, size: %s" %
-              (r._hash, humanize(info.size)))
-        assert info.size == r.copied
-
-        print("Uninstall app first")
-        d.shell(['pm', 'uninstall', package_name])
-
-        print("install to android system ...")
-        try:
-            start = time.time()
-            if args.install_confirm:
-                import uiautomator2 as u2
-                ud = u2.connect(args.serial)
+        def _callback(event_name: str, ud):
+            name = "_INSTALL_"
+            if event_name == "BEFORE_INSTALL":
+                print("== Enable popup window watcher")
                 ud.press("home")
-                with ud.watch_context() as ctx:
-                    ctx.when("允许").click()
-                    ctx.when("继续安装").click()
-                    ctx.when("安装").click()
+                ud.watcher(name).when("允许").click()
+                ud.watcher(name).when("继续安装").click()
+                ud.watcher(name).when("安装").click()
+                ud.watcher.start()
+            elif event_name == "FINALLY":
+                print("== Stop popup window watcher")
+                ud.watcher.remove(name)
+                ud.watcher.stop()
+        
+        if args.install_confirm:
+            import uiautomator2 as u2
+            ud = u2.connect(args.serial)
+            _callback = functools.partial(_callback, ud=ud)
+        else:
+            _callback = None
 
-                    d.install_remote(dst, clean=True)
-            else:
-                d.install_remote(dst, clean=True)
-            print("Success installed, time used %d seconds" %
-                (time.time() - start))
-            if args.launch:
-                print("Launch app: %s/%s" % (package_name, main_activity))
-                d.shell(['am', 'start', '-n', package_name+"/"+main_activity])
-
-        except AdbInstallError as e:
-            if e.reason in ["INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
-                    "INSTALL_FAILED_UPDATE_INCOMPATIBLE", "INSTALL_FAILED_VERSION_DOWNGRADE"]:
-                print("uninstall %s because %s" % (package_name, e.reason))
-                d.uninstall(package_name)
-                d.install_remote(dst, clean=True)
-                print("Success installed, time used %d seconds" %
-                    (time.time() - start))
-                if args.launch:
-                    print("Launch app: %s/%s" % (package_name, main_activity))
-                    d.shell(['am', 'start', '-n', package_name+"/"+main_activity])
-            elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
-                print("Catch error %s, reinstall" % e.reason)
-                d.install_remote(dst, clean=True)
-                print("Success installed, time used %d seconds" %
-                      (time.time() - start))
-            else:
-                sys.exit(
-                    "Failure " + e.reason + "\n" +
-                    "Remote apk is not removed. Manually install command:\n\t"
-                    + "adb shell pm install -r -t " + dst)
+        d.install(args.install, uninstall=True, callback=_callback)
 
     elif args.uninstall:
-        d.shell(["pm", "uninstall", args.uninstall])
+        d.uninstall(args.uninstall)
 
     elif args.list_packages:
         patten = re.compile(args.grep or ".*")

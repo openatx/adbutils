@@ -1,15 +1,18 @@
 # coding: utf-8
 import json
+import os
 import re
 import time
 import typing
 import warnings
-from datetime import datetime
 from collections import namedtuple
+from datetime import datetime
 
 import apkutils2
+import requests
 from retry import retry
 
+from adbutils._utils import ReadProgress, humanize
 from adbutils.errors import AdbError, AdbInstallError
 
 _DISPLAY_RE = re.compile(
@@ -21,7 +24,6 @@ WindowSize = namedtuple("WindowSize", ['width', 'height'])
 
 class ShellMixin(object):
     """ provide custom functions for some complex operations """
-
     def _run(self, cmd) -> str:
         return self.shell(cmd)
 
@@ -79,7 +81,7 @@ class ShellMixin(object):
         }
         return self._run(cmd_dict[status])
 
-    def keyevent(self, key_code: (int, str)) -> str:
+    def keyevent(self, key_code: typing.Union[int, str]) -> str:
         """ adb _run input keyevent KEY_CODE """
         return self._run(['input', 'keyevent', str(key_code)])
 
@@ -124,39 +126,42 @@ class ShellMixin(object):
         Args:
             text: str
         """
-        escaped = text.translate(str.maketrans({"-":  r"\-",
-                                                "+":  r"\+",
-                                                "[":  r"\[",
-                                                "]":  r"\]",
-                                                "(":  r"\(",
-                                                ")":  r"\)",
-                                                "{":  r"\{",
-                                                "}":  r"\}",
-                                                "\\": r"\\\\",
-                                                "^":  r"\^",
-                                                "$":  r"\$",
-                                                "*":  r"\*",
-                                                ".":  r"\.",
-                                                ",":  r"\,",
-                                                ":":  r"\:",
-                                                "~":  r"\~",
-                                                ";":  r"\;",
-                                                ">":  r"\>",
-                                                "<":  r"\<",
-                                                "%":  r"\%",
-                                                "#":  r"\#",
-                                                "\'":  r"\\'",
-                                                "\"":  r'\\"',
-                                                "`":  r"\`",
-                                                "!":  r"\!",
-                                                "?":  r"\?",
-                                                "|":  r"\|",
-                                                "=":  r"\=",
-                                                "@":  r"\@",
-                                                "/":  r"\/",
-                                                "_":  r"\_",
-                                                " ":  r"%s",  # special
-                                                "&":  r"\&"}))
+        escaped = text.translate(
+            str.maketrans({
+                "-": r"\-",
+                "+": r"\+",
+                "[": r"\[",
+                "]": r"\]",
+                "(": r"\(",
+                ")": r"\)",
+                "{": r"\{",
+                "}": r"\}",
+                "\\": r"\\\\",
+                "^": r"\^",
+                "$": r"\$",
+                "*": r"\*",
+                ".": r"\.",
+                ",": r"\,",
+                ":": r"\:",
+                "~": r"\~",
+                ";": r"\;",
+                ">": r"\>",
+                "<": r"\<",
+                "%": r"\%",
+                "#": r"\#",
+                "\'": r"\\'",
+                "\"": r'\\"',
+                "`": r"\`",
+                "!": r"\!",
+                "?": r"\?",
+                "|": r"\|",
+                "=": r"\=",
+                "@": r"\@",
+                "/": r"\/",
+                "_": r"\_",
+                " ": r"%s",  # special
+                "&": r"\&"
+            }))
         return escaped
 
     def wlan_ip(self) -> str:
@@ -170,25 +175,119 @@ class ShellMixin(object):
         result = self._run(['ifconfig', 'wlan0'])
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
-    def install(self, apk_path: str, force: bool = False):
+    def install(self,
+                path_or_url: str,
+                nolaunch: bool = False,
+                uninstall: bool = False,
+                silent: bool = False,
+                callback: typing.Callable[[str], None] = None):
         """
-        sdk = self.getprop('ro.build.version.sdk')
-        sdk > 23 support -g
+        Install APK to device
 
         Args:
-            force (bool): uninstall package before install
-
+            path_or_url: local path or http url
+            nolaunch: do not launch app after install
+            uninstall: uninstall app before install
+            silent: disable log message print
+            callback: only two event now: <"BEFORE_INSTALL" | "FINALLY">
+        
         Raises:
             AdbInstallError
         """
-        dst = "/data/local/tmp/tmp-{}.apk".format(int(time.time() * 1000))
+        if re.match(r"^https?://", path_or_url):
+            resp = requests.get(path_or_url, stream=True)
+            resp.raise_for_status()
+            length = int(resp.headers.get("Content-Length", 0))
+            r = ReadProgress(resp.raw, length)
+            print("tmpfile path:", r.filepath())
+        else:
+            length = os.stat(path_or_url).st_size
+            fd = open(path_or_url, "rb")
+            r = ReadProgress(fd, length, source_path=path_or_url)
 
-        self.sync.push(apk_path, dst)
-        if force:
-            apk = apkutils2.APK(apk_path)
-            package_name = apk.manifest.package_name
+        def _dprint(*args):
+            if not silent:
+                print(*args)
+
+        dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
+        _dprint("push to %s" % dst)
+
+        start = time.time()
+        self.sync.push(r, dst)
+
+        # parse apk package-name
+        apk = apkutils2.APK(r.filepath())
+        package_name = apk.manifest.package_name
+        main_activity = apk.manifest.main_activity
+        if main_activity and main_activity.find(".") == -1:
+            main_activity = "." + main_activity
+
+        version_name = apk.manifest.version_name
+        _dprint("packageName:", package_name)
+        _dprint("mainActivity:", main_activity)
+        _dprint("apkVersion: {}".format(version_name))
+        _dprint("Success pushed, time used %d seconds" % (time.time() - start))
+
+        new_dst = "/data/local/tmp/{}-{}.apk".format(package_name,
+                                                     version_name)
+        self.shell(["mv", dst, new_dst])
+
+        dst = new_dst
+        info = self.sync.stat(dst)
+        print("verify pushed apk, md5: %s, size: %s" %
+              (r._hash, humanize(info.size)))
+        assert info.size == r.copied
+
+        if uninstall:
+            _dprint("Uninstall app first")
             self.uninstall(package_name)
-        self.install_remote(dst, clean=True)
+
+        _dprint("install to android system ...")
+        try:
+            start = time.time()
+            if callback:
+                callback("BEFORE_INSTALL")
+
+            self.install_remote(dst, clean=True)
+            _dprint("Success installed, time used %d seconds" %
+                    (time.time() - start))
+            if not nolaunch:
+                _dprint("Launch app: %s/%s" % (package_name, main_activity))
+                self.app_start(package_name, main_activity)
+
+        except AdbInstallError as e:
+            if e.reason in [
+                    "INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
+                    "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
+                    "INSTALL_FAILED_VERSION_DOWNGRADE"
+            ]:
+                _dprint("uninstall %s because %s" % (package_name, e.reason))
+                self.uninstall(package_name)
+                self.install_remote(dst, clean=True)
+                _dprint("Success installed, time used %d seconds" %
+                        (time.time() - start))
+                if not nolaunch:
+                    _dprint("Launch app: %s/%s" %
+                            (package_name, main_activity))
+                    self.app_start(package_name, main_activity)
+                    # self.shell([
+                    #     'am', 'start', '-n', package_name + "/" + main_activity
+                    # ])
+            elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
+                _dprint("Catch error %s, reinstall" % e.reason)
+                self.install_remote(dst, clean=True)
+                _dprint("Success installed, time used %d seconds" %
+                        (time.time() - start))
+            else:
+                # print to console
+                print(
+                    "Failure " + e.reason + "\n" +
+                    "Remote apk is not removed. Manually install command:\n\t"
+                    + "adb shell pm install -r -t " + dst)
+                raise
+        finally:
+            if callback:
+                callback("FINALLY")
 
     def install_remote(self,
                        remote_path: str,
@@ -257,10 +356,12 @@ class ShellMixin(object):
 
         time_regex = r"[-\d]+\s+[:\d]+"
         m = re.compile(f"firstInstallTime=({time_regex})").search(output)
-        first_install_time = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
+        first_install_time = datetime.strptime(
+            m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
 
         m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
-        last_update_time= datetime.strptime(m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
+        last_update_time = datetime.strptime(
+            m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
 
         return dict(package_name=package_name,
                     version_name=version_name,
@@ -443,8 +544,8 @@ class _ScreenRecord():
         if self._started:
             warnings.warn("screenrecord already started", UserWarning)
             return
-        self._stream = self._d.shell(
-            ["screenrecord", self._remote_path], stream=True)
+        self._stream = self._d.shell(["screenrecord", self._remote_path],
+                                     stream=True)
         self._started = True
 
     def stop(self):
