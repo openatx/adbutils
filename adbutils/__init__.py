@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import datetime
+import enum
 import json
 import os
 import re
@@ -11,9 +12,10 @@ import socket
 import stat
 import struct
 import subprocess
+import typing
 from collections import namedtuple
 from contextlib import contextmanager
-from typing import Union, Iterator, Optional
+from typing import ContextManager, Union, Iterator, Optional
 
 import pkg_resources
 import six
@@ -31,6 +33,17 @@ _DATA = "DATA"
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
+
+class Network(str, enum.Enum):
+    TCP = "tcp"
+    UNIX = "unix"
+
+    DEV = "dev"
+    LOCAL = "local"
+    LOCAL_RESERVED = "localreserved"
+    LOCAL_FILESYSTEM = "localfilesystem"
+    LOCAL_ABSTRACT = "localabstract" # same as UNIX
+
 
 DeviceEvent = namedtuple('DeviceEvent', ['present', 'serial', 'status'])
 ForwardItem = namedtuple("ForwardItem", ["serial", "local", "remote"])
@@ -530,6 +543,34 @@ class AdbDevice(ShellMixin):
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
 
+    def create_connection(self, network: Network, address: Union[int, str]):
+        """
+        Used to connect a socket (unix of tcp) on the device
+
+        Returns:
+            socket object
+
+        Raises:
+            AssertionError, ValueError
+        """
+        c = self._client._connect()
+        c.send_command("host:transport:" + self._serial)
+        c.check_okay()
+        if network == Network.TCP:
+            assert isinstance(address, int)
+            c.send_command("tcp:" + str(address))
+            c.check_okay()
+        elif network in [Network.UNIX, Network.LOCAL_ABSTRACT]:
+            assert isinstance(address, str)
+            c.send_command("localabstract:" + address)
+            c.check_okay()
+        elif network in [Network.LOCAL_FILESYSTEM, Network.LOCAL, Network.DEV, Network.LOCAL_RESERVED]:
+            c.send_command(network + ":" + address)
+            c.check_okay()
+        else:
+            raise ValueError("Unsupported network type", network)
+        return c.conn
+    
 
 class Sync():
     def __init__(self, adbclient: AdbClient, serial: str):

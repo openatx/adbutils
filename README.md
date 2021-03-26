@@ -4,6 +4,35 @@
 
 Python adb library for adb service (Only support Python3.6+)
 
+**Table of Contents**
+
+<!--ts-->
+   * [adbutils](#adbutils)
+   * [Install](#install)
+   * [Usage](#usage)
+      * [Connect ADB Server](#connect-adb-server)
+      * [List all the devices and get device object](#list-all-the-devices-and-get-device-object)
+      * [Connect remote device](#connect-remote-device)
+      * [adb forward and adb reverse](#adb-forward-and-adb-reverse)
+      * [Create socket connection to the device](#create-socket-connection-to-the-device)
+      * [Run shell command](#run-shell-command)
+      * [Transfer files](#transfer-files)
+      * [Extended Functions](#extended-functions)
+      * [Run in command line 命令行使用](#run-in-command-line-命令行使用)
+         * [Environment variables](#environment-variables)
+         * [Color Logcat](#color-logcat)
+      * [Experiment](#experiment)
+      * [Examples](#examples)
+   * [Develop](#develop)
+      * [Watch adb socket data](#watch-adb-socket-data)
+   * [Thanks](#thanks)
+   * [Ref](#ref)
+   * [LICENSE](#license)
+
+<!-- Added by: shengxiang, at: 2021年 3月26日 星期五 15时05分04秒 CST -->
+
+<!--te-->
+
 # Install
 ```
 pip3 install adbutils
@@ -78,6 +107,34 @@ for event in adb.track_devices():
 
 # When adb-server killed, AdbError will be raised
 ```
+
+## Create socket connection to the device
+
+For example
+
+```python
+# minitouch: https://github.com/openstf/minitouch
+c = d.create_connection("unix", "minitouch")
+print(c.recv(500))
+c.close()
+```
+
+```python
+c = d.create_connection("tcp", 7912) # the second argument must be int
+c.send(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+print(c.recv(500))
+c.close()
+```
+
+```python
+# read device file
+with d.create_connection(adbutils.Network.DEV, "/data/local/tmp/hello.txt") as c:
+    print(c.recv(500))
+```
+
+There are many other usage, see [SERVICES.TXT](https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/SERVICES.TXT;l=175) for more details
+
+Thanks for Pull Request from [@hfutxqd](https://github.com/openatx/adbutils/pull/27)
 
 ## Run shell command
 I assume there is only one device connected.
@@ -187,57 +244,6 @@ r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remo
 
 For further usage, please read [mixin.py](adbutils/mixin.py) for details.
 
-## Examples
-Record video using screenrecord
-
-```python
-stream = d.shell("screenrecord /sdcard/s.mp4", stream=True)
-time.sleep(3) # record for 3 seconds
-with stream:
-	stream.send("\003") # send Ctrl+C
-	stream.read_until_close()
-
-start = time.time()
-print("Video total time is about", time.time() - start)
-d.sync.pull("/sdcard/s.mp4", "s.mp4") # pulling video
-```
-
-Reading Logcat
-
-```python
-d.shell("logcat --clear")
-stream = d.shell("logcat", stream=True)
-with stream:
-    f = stream.conn.makefile()
-    for _ in range(100): # read 100 lines
-        line = f.readline()
-        print("Logcat:", line.rstrip())
-    f.close()
-```
-
-## Develop
-```sh
-git clone https://github.com/openatx/adbutils adbutils
-pip3 install -e adbutils # install as development mode
-```
-
-Now you can edit code in `adbutils` and test with
-
-```python
-import adbutils
-# .... test code here ...
-```
-
-Run tests requires one device connected to your computer
-
-```sh
-# change to repo directory
-cd adbutils
-
-pip3 install pytest
-pytest tests/
-```
-
 ## Run in command line 命令行使用
 
 ```bash
@@ -337,11 +343,83 @@ $ python -m adbutils --install-confirm -i some.apk
 
 For more usage, please see the code for details.
 
+## Examples
+Record video using screenrecord
+
+```python
+stream = d.shell("screenrecord /sdcard/s.mp4", stream=True)
+time.sleep(3) # record for 3 seconds
+with stream:
+	stream.send("\003") # send Ctrl+C
+	stream.read_until_close()
+
+start = time.time()
+print("Video total time is about", time.time() - start)
+d.sync.pull("/sdcard/s.mp4", "s.mp4") # pulling video
+```
+
+Reading Logcat
+
+```python
+d.shell("logcat --clear")
+stream = d.shell("logcat", stream=True)
+with stream:
+    f = stream.conn.makefile()
+    for _ in range(100): # read 100 lines
+        line = f.readline()
+        print("Logcat:", line.rstrip())
+    f.close()
+```
+
+# Develop
+```sh
+git clone https://github.com/openatx/adbutils adbutils
+pip3 install -e adbutils # install as development mode
+```
+
+Now you can edit code in `adbutils` and test with
+
+```python
+import adbutils
+# .... test code here ...
+```
+
+Run tests requires one device connected to your computer
+
+```sh
+# change to repo directory
+cd adbutils
+
+pip3 install pytest
+pytest tests/
+```
+
+## Watch adb socket data
+Watch the adb socket data using `socat`
+
+```
+$ socat -t100 -x -v TCP-LISTEN:5577,reuseaddr,fork TCP4:localhost:5037
+```
+
+open another terminal, type the following command then you will see the socket data
+
+```bash
+$ export ANDROID_ADB_SERVER_PORT=5577
+$ adb devices
+```
+
+## Generate TOC
+```bash
+gh-md-toc --insert README.md
+```
+
+<https://github.com/ekalinin/github-markdown-toc>
+
 # Thanks
 - [swind pure-python-adb](https://github.com/Swind/pure-python-adb)
 - [openstf/adbkit](https://github.com/openstf/adbkit)
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
-- ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
+- ADB Protocols [OVERVIEW.TXT](https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/OVERVIEW.TXT) [SERVICES.TXT](https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/SERVICES.TXT) [SYNC.TXT](https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/SYNC.TXT)
 - [Awesome ADB](https://github.com/mzlogin/awesome-adb)
 - [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
 
