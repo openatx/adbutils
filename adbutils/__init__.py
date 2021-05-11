@@ -12,10 +12,9 @@ import socket
 import stat
 import struct
 import subprocess
-import typing
 from collections import namedtuple
 from contextlib import contextmanager
-from typing import ContextManager, Union, Iterator, Optional
+from typing import Union, Iterator, Optional
 
 import pkg_resources
 import six
@@ -597,8 +596,9 @@ class Sync():
         with self._prepare_sync(path, "STAT") as c:
             assert "STAT" == c.read_string(4)
             mode, size, mtime = struct.unpack("<III", c.conn.recv(12))
-            return FileInfo(mode, size, datetime.datetime.fromtimestamp(mtime),
-                            path)
+            # when mtime is 0, windows will error
+            mdtime = datetime.datetime.fromtimestamp(mtime) if mtime else None
+            return FileInfo(mode, size, mdtime, path)
 
     def iter_directory(self, path: str):
         with self._prepare_sync(path, "LIST") as c:
