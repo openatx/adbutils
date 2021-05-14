@@ -67,13 +67,26 @@ d = adb.device()
 
 The following code will not write `from adbutils import adb` for short
 
-## Connect remote device
+## Connect or disconnect remote device
 Same as command `adb connect`
 
 ```python
 output = adb.connect("127.0.0.1:5555")
 print(output)
 # output: already connected to 127.0.0.1:5555
+
+# connect with timeout
+try:
+    adb.connect("127.0.0.1:5555", timeout=3.0)
+except AdbTimeout as e:
+    print(e)
+
+adb.disconnect("127.0.0.1:5555")
+adb.disconnect("127.0.0.1:5555", raise_error=True) # if device is not present, AdbError will raise
+
+# wait-for-device
+adb.wait_for("127.0.0.1:5555", state="device") # wait for device online, state default value is "device"
+adb.wait_for("127.0.0.1:5555", state="disconnect") # wait device disconnect
 ```
 
 ## adb forward and adb reverse
@@ -162,6 +175,10 @@ d.prop.model
 d.prop.device
 d.prop.get("ro.product.model")
 d.prop.get("ro.product.model", cache=True) # a little faster, use cache data first
+
+d.get_serialno() # same as adb get-serialno
+d.get_devpath() # same as adb get-devpath
+d.get_state() # same as adb get-state
 ```
 
 ## Transfer files

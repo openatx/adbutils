@@ -119,8 +119,12 @@ class _AdbStreamConnection(object):
         return self.__conn
 
     def read(self, n: int) -> bytes:
-        """ read fully
-        """
+        try:
+            return self._read_fully(n)
+        except socket.timeout:
+            raise AdbTimeout("adb read timeout")
+
+    def _read_fully(self, n: int) -> bytes:
         t = n
         buffer = b''
         while t > 0:
@@ -181,8 +185,11 @@ class AdbClient(object):
         self.__host = host
         self.__port = port
 
-    def _connect(self):
-        return _AdbStreamConnection(self.__host, self.__port)
+    def _connect(self, timeout: float = None) -> _AdbStreamConnection:
+        _conn = _AdbStreamConnection(self.__host, self.__port)
+        if timeout:
+            _conn.conn.settimeout(timeout)
+        return _conn
 
     def server_version(self):
         """ 40 will match 1.0.40
@@ -205,33 +212,79 @@ class AdbClient(object):
                 c.send_command("host:kill")
                 c.check_okay()
 
-    def connect(self, addr: str) -> str:
+    def wait_for(self, serial: str = None, transport: str = 'any', state: str = "device", timeout: float=60):
+        """ Same as wait-for-TRANSPORT-STATE
+        Args:
+            serial (str): device serial [default None]
+            transport (str): {any,usb,local} [default any]
+            state (str): {device,recovery,rescue,sideload,bootloader,disconnect} [default device]
+            timeout (float): max wait time [default 60]
+        
+        Raises:
+            AdbError, AdbTimeout
+        """
+        with self._connect(timeout=timeout) as c:
+            cmds = []
+            if serial:
+                cmds.extend(['host-serial', serial])
+            else:
+                cmds.append('host')
+            cmds.append("wait-for-" + transport + "-" + state)
+            c.send_command(":".join(cmds))
+            c.check_okay()
+            c.check_okay()
+
+    # def reconnect(self, addr: str, timeout: float=None) -> str:
+    #     """ this function is not same as adb reconnect
+    #     actually the behavior is same as
+    #         - adb disconnect x.x.x.x
+    #         - adb connect x.x.x.x
+    #     """
+    #     self.disconnect(addr)
+    #     return self.connect(addr, timeout=timeout)
+
+    def connect(self, addr: str, timeout: float=None) -> str:
         """ adb connect $addr
+        Args:
+            addr (str): adb remote address [eg: 191.168.0.1:5555]
+            timeout (float): connect timeout
+
         Returns:
             content adb server returns
+        
+        Raises:
+            AdbTimeout
 
         Example returns:
             - "already connected to 192.168.190.101:5555"
             - "unable to connect to 192.168.190.101:5551"
+            - "failed to connect to '1.2.3.4:4567': Operation timed out"
         """
-        with self._connect() as c:
+        with self._connect(timeout=timeout) as c:
             c.send_command("host:connect:" + addr)
             c.check_okay()
             return c.read_string_block()
 
-    def disconnect(self, addr: str) -> str:
+    def disconnect(self, addr: str, raise_error: bool=False) -> str:
         """ adb disconnect $addr
         Returns:
             content adb server returns
 
+        Raises:
+            when raise_error set to True
+                AdbError("error: no such device '1.2.3.4:5678')
+
         Example returns:
             - "disconnected 192.168.190.101:5555"
         """
-
-        with self._connect() as c:
-            c.send_command("host:disconnect:" + addr)
-            c.check_okay()
-            return c.read_string_block()
+        try:
+            with self._connect() as c:
+                c.send_command("host:disconnect:" + addr)
+                c.check_okay()
+                return c.read_string_block()
+        except AdbError:
+            if raise_error:
+                raise
 
     def shell(self,
               serial: str,
@@ -443,6 +496,25 @@ class AdbDevice(ShellMixin):
     @property
     def serial(self):
         return self._serial
+
+    def _get_with_command(self, cmd: str) -> str:
+        with self._client._connect() as c:
+            cmds = ["host-serial", self._serial, cmd]
+            c.send_command(":".join(cmds))
+            c.check_okay()
+            return c.read_string_block()
+
+    def get_state(self) -> str:
+        """ return device state {offline,bootloader,device} """
+        return self._get_with_command("get-state")
+    
+    def get_serialno(self) -> str:
+        """ return the real device id, not the connect serial """
+        return self._get_with_command("get-serialno")
+    
+    def get_devpath(self) -> str:
+        """ example return: usb:12345678Y """
+        return self._get_with_command("get-devpath")
 
     def __repr__(self):
         return "AdbDevice(serial={})".format(self.serial)

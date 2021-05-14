@@ -20,5 +20,24 @@ def test_shell(device):
 
 
 def test_adb_connect():
-    ret = adb.connect("1270.0.0.1:1234")
-    assert isinstance(ret, str)
+    with pytest.raises(adbutils.AdbTimeout):
+        adb.connect("1270.0.0.1:1234", timeout=1.0)
+
+
+def test_adb_disconnect():
+    with pytest.raises(adbutils.AdbError):
+        adb.disconnect("1270.0.0.1:1234", raise_error=True)
+
+
+def test_wait_for():
+    adb.wait_for("127.0.0.1:1234", state="disconnect", timeout=1)
+    adb.wait_for(transport="usb", state="device", timeout=1)
+
+    with pytest.raises(adbutils.AdbTimeout):
+        adb.wait_for(transport="usb", state="disconnect", timeout=.5)
+
+
+def test_get_xxx(device: adbutils.AdbDevice):
+    assert device.get_serialno()
+    assert device.get_state() == "device"
+    assert device.get_devpath().startswith("usb:")
