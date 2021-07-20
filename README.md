@@ -440,6 +440,9 @@ gh-md-toc --insert README.md
 - [Awesome ADB](https://github.com/mzlogin/awesome-adb)
 - [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
 
+# Alternative
+- https://github.com/Swind/pure-python-adb
+
 # Ref
 - <https://github.com/imageio/imageio-ffmpeg/blob/80e37882d0/imageio_ffmpeg/_utils.py>
 
