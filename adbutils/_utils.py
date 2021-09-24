@@ -66,10 +66,10 @@ def _popen_kwargs(prevent_sigint=False):
 def _is_valid_exe(exe: str):
     cmd = [exe, "version"]
     try:
-        with open(os.devnull, "w") as null:
-            subprocess.check_call(
-                cmd, stdout=null, stderr=subprocess.STDOUT, **_popen_kwargs()
-            )
+        subprocess.check_call(
+            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT, **_popen_kwargs()
+        )
         return True
     except (OSError, ValueError, subprocess.CalledProcessError):
         return False
