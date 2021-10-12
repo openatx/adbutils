@@ -543,6 +543,7 @@ class AdbDevice(ShellMixin):
         cmdline = subprocess.list2cmdline(map(str, cmds))
         try:
             return subprocess.check_output(cmdline,
+                                           stdin=subprocess.DEVNULL,
                                            stderr=subprocess.STDOUT,
                                            shell=True).decode('utf-8')
         except subprocess.CalledProcessError as e:
