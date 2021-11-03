@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import socket
+import subprocess
 import sys
 import time
 import zipfile
@@ -26,9 +27,8 @@ import requests
 
 import adbutils
 from adbutils import adb as adbclient
-from adbutils._utils import ReadProgress, current_ip, humanize
+from adbutils._utils import ReadProgress, current_ip, humanize, APKReader
 from adbutils.errors import AdbError, AdbInstallError
-
 
 
 def _setup_minicap(d: adbutils.AdbDevice):
@@ -109,6 +109,7 @@ def main():
     parser.add_argument("-u", "--uninstall", help="uninstall apk")
     parser.add_argument("-L", "--launch", action="store_true", help="launch after install")
     parser.add_argument("--qrcode", help="show qrcode of the specified file")
+    parser.add_argument("--parse", type=str, help="parse package info from local file or url")
     parser.add_argument("--clear",
                         action="store_true",
                         help="clear all data when uninstall")
@@ -199,6 +200,28 @@ def main():
         for event in adbclient.track_devices():
             asctime = datetime.datetime.now().strftime("%H:%M:%S.%f")
             print("{} {} -> {}".format(asctime[:-3], event.serial, event.status))
+        return
+
+    elif args.parse:
+        uri = args.parse
+        
+        fp = None
+        if re.match(r"^https?://", uri):
+            try:
+                import httpio
+            except ImportError:
+                retcode = subprocess.call([sys.executable, '-m', 'pip', 'install', '-U', 'httpio'])
+                assert retcode == 0
+                import httpio
+            fp = httpio.open(uri, block_size=-1)
+        else:
+            assert os.path.isfile(uri)
+            fp = open(uri, 'rb')
+        try:
+            ar = APKReader(fp)
+            ar.dump_info()
+        finally:
+            fp.close()
         return
 
     ## Device operation
@@ -304,6 +327,7 @@ def main():
         package_name = d.current_app()['package']
         info = d.package_info(package_name)
         print(json.dumps(info, indent=4, default=str))
+
     elif args.package:
         info = d.package_info(args.package)
         print(json.dumps(info, indent=4, default=str))

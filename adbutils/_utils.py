@@ -5,8 +5,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import typing
+import zipfile
 
 import whichcraft
+from apkutils2.axml.axmlparser import AXML
+from apkutils2.manifest import Manifest
 from pkg_resources import resource_filename
 
 MB = 1024 * 1024
@@ -135,3 +139,20 @@ class ReadProgress():
         self._tmpfd.seek(0)
         return self._tmpfd.name
 
+
+class APKReader:
+    def __init__(self, fp: typing.BinaryIO):
+        self._fp = fp
+    
+    def dump_info(self):
+        zf = zipfile.ZipFile(self._fp)
+        raw_manifest = zf.read("AndroidManifest.xml")
+        axml = AXML(raw_manifest)
+        if not axml.is_valid:
+            print("axml is invalid")
+            return
+        am = Manifest(axml.get_xml())
+        print("package:", am.package_name)
+        print("main-activity:", am.main_activity)
+        print("version-name:", am.version_name)
+        print("version-code:", am.version_code)

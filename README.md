@@ -280,6 +280,14 @@ $ python -m adbutils -i http://example.com/some.apk
 # Install and launch (-L or --launch)
 $ python -m adbutils -i http://example.com/some.apk -L
 
+# Parse apk info (support URL and local)
+$ python -m adbutils --parse http://example.com/some.apk
+$ python -m adbutils --parse some.apk
+package: com.example.some
+main-activity: com.example.some.MainActivity
+version-name: 1.0.0
+version-code: 100
+
 # Uninstall 卸载应用
 $ python -m adbutils -u com.github.example
 
