@@ -290,7 +290,7 @@ class AdbClient(object):
               serial: str,
               command: Union[str, list, tuple],
               stream: bool = False,
-              timeout: Optional[float] = None) -> str:
+              timeout: Optional[float] = None) -> Union[str, _AdbStreamConnection]:
         """Run shell in android and return output
         Args:
             serial (str)
