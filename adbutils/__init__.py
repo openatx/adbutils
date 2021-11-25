@@ -186,10 +186,18 @@ class AdbClient(object):
         self.__port = port
 
     def _connect(self, timeout: float = None) -> _AdbStreamConnection:
-        _conn = _AdbStreamConnection(self.__host, self.__port)
-        if timeout:
-            _conn.conn.settimeout(timeout)
-        return _conn
+        """ connect to adb server
+        
+        Raises:
+            AdbTimeout
+        """
+        try:
+            _conn = _AdbStreamConnection(self.__host, self.__port)
+            if timeout:
+                _conn.conn.settimeout(timeout)
+            return _conn
+        except TimeoutError:
+            raise AdbTimeout("connect to adb server timeout")
 
     def server_version(self):
         """ 40 will match 1.0.40
