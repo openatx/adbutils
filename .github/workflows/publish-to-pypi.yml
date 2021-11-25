@@ -16,7 +16,7 @@ jobs:
       run: >-
         python3 -m pip install wheel
     - name: Build targz and wheel
-      run: >-
+      run: |
         python3 setup.py sdist
         python3 build_wheel.py
     - name: Publish distribution 📦 to PyPI
