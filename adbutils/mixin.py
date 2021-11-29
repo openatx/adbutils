@@ -175,6 +175,7 @@ class ShellMixin(object):
         result = self._run(['ifconfig', 'wlan0'])
         return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
 
+    @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
     def install(self,
                 path_or_url: str,
                 nolaunch: bool = False,
@@ -192,7 +193,7 @@ class ShellMixin(object):
             callback: only two event now: <"BEFORE_INSTALL" | "FINALLY">
         
         Raises:
-            AdbInstallError
+            AdbInstallError, BrokenPipeError
         """
         if re.match(r"^https?://", path_or_url):
             resp = requests.get(path_or_url, stream=True)
