@@ -29,6 +29,7 @@ _DENT = "DENT"  # Directory Entity
 _DONE = "DONE"
 _DATA = "DATA"
 
+_DEFAULT_SOCKET_TIMEOUT = 60
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
@@ -172,7 +173,7 @@ class _AdbStreamConnection(object):
 
 
 class AdbClient(object):
-    def __init__(self, host: str = None, port: int = None):
+    def __init__(self, host: str = None, port: int = None, socket_timeout: float = None):
         """
         Args:
             host (str): default value from env:ANDROID_ADB_SERVER_HOST
@@ -184,6 +185,7 @@ class AdbClient(object):
             port = int(os.environ.get("ANDROID_ADB_SERVER_PORT", 5037))
         self.__host = host
         self.__port = port
+        self.__socket_timeout = socket_timeout
 
     def _connect(self, timeout: float = None) -> _AdbStreamConnection:
         """ connect to adb server
@@ -191,6 +193,7 @@ class AdbClient(object):
         Raises:
             AdbTimeout
         """
+        timeout = timeout or self.__socket_timeout
         try:
             _conn = _AdbStreamConnection(self.__host, self.__port)
             if timeout:
@@ -318,7 +321,8 @@ class AdbClient(object):
         assert isinstance(command, six.string_types)
         c = self._connect()
         # when no response in timeout, socket.timeout will raise
-        c.conn.settimeout(timeout)
+        if stream is False and timeout:
+            c.conn.settimeout(timeout)
         try:
             c.send_command("host:transport:" + serial)
             c.check_okay()
@@ -784,7 +788,7 @@ class Property():
         return self.get("ro.product.device", cache=True)
 
 
-adb = AdbClient()
+adb = AdbClient(socket_timeout=_DEFAULT_SOCKET_TIMEOUT)
 device = adb.device
 
 # device = adb.device

@@ -19,14 +19,14 @@ def test_shell(device):
     assert output in ["/\n", "/\r\n"]
 
 
-def test_adb_connect():
+def test_adb_connect(device: adbutils.AdbDevice):
     with pytest.raises(adbutils.AdbTimeout):
-        adb.connect("1270.0.0.1:1234", timeout=1.0)
+        device.shell("sleep 10", timeout=1.0)
 
 
 def test_adb_disconnect():
     with pytest.raises(adbutils.AdbError):
-        adb.disconnect("1270.0.0.1:1234", raise_error=True)
+        adb.disconnect("127.0.0.1:1234", raise_error=True)
 
 
 def test_wait_for():
