@@ -29,7 +29,6 @@ _DENT = "DENT"  # Directory Entity
 _DONE = "DONE"
 _DATA = "DATA"
 
-_DEFAULT_SOCKET_TIMEOUT = 60
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+), .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
@@ -788,7 +787,7 @@ class Property():
         return self.get("ro.product.device", cache=True)
 
 
-adb = AdbClient(socket_timeout=_DEFAULT_SOCKET_TIMEOUT)
+adb = AdbClient()
 device = adb.device
 
 # device = adb.device

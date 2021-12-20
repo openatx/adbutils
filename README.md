@@ -48,7 +48,7 @@ import adbutils
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
 print(adb.devices())
 
-# Set socket timeout to 10 (default 60)
+# Set socket timeout to 10 (default None)
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=10)
 print(adb.devices())
 ```
