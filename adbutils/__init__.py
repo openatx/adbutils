@@ -19,6 +19,7 @@ from typing import Union, Iterator, Optional
 import pkg_resources
 import six
 from adbutils._utils import get_adb_exe
+from adbutils._utils import _is_valid_exe
 from adbutils.errors import AdbError, AdbTimeout
 from adbutils.mixin import ShellMixin
 from deprecation import deprecated
@@ -82,9 +83,10 @@ def adb_path():
 
 
 class _AdbStreamConnection(object):
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, adb_path: str = None):
         self.__host = host
         self.__port = port
+        self.__adb_path = adb_path
         self.__conn = self._safe_connect()
 
     def _create_socket(self):
@@ -102,7 +104,13 @@ class _AdbStreamConnection(object):
         try:
             return self._create_socket()
         except ConnectionRefusedError:
-            subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
+            if self.__adb_path:
+                if _utils._is_valid_exe(self.__adb_path):
+                    subprocess.run([self.__adb_path, "start-server"], timeout=20.0)  # 20s should enough for adb start
+                else:
+                    raise RuntimeError("ADB path passed in does not point to a valid executable file.")
+            else:
+                subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             return self._create_socket()
 
     def close(self):
@@ -134,7 +142,7 @@ class _AdbStreamConnection(object):
             buffer += chunk
             t = n - len(buffer)
         return buffer
-        
+
     def send_command(self, cmd: str):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
@@ -172,11 +180,13 @@ class _AdbStreamConnection(object):
 
 
 class AdbClient(object):
-    def __init__(self, host: str = None, port: int = None, socket_timeout: float = None):
+    def __init__(self, host: str = None, port: int = None, socket_timeout: float = None, adb_path: str = None):
         """
         Args:
             host (str): default value from env:ANDROID_ADB_SERVER_HOST
             port (int): default value from env:ANDROID_ADB_SERVER_PORT
+            socket_timeout (float): socket timeout
+            adb_path (str): a path-like string that indicates your custom adb excutable file path
         """
         if not host:
             host = os.environ.get("ANDROID_ADB_SERVER_HOST", "127.0.0.1")
@@ -185,16 +195,17 @@ class AdbClient(object):
         self.__host = host
         self.__port = port
         self.__socket_timeout = socket_timeout
+        self.__adb_path = adb_path
 
     def _connect(self, timeout: float = None) -> _AdbStreamConnection:
         """ connect to adb server
-        
+
         Raises:
             AdbTimeout
         """
         timeout = timeout or self.__socket_timeout
         try:
-            _conn = _AdbStreamConnection(self.__host, self.__port)
+            _conn = _AdbStreamConnection(self.__host, self.__port, self.__adb_path)
             if timeout:
                 _conn.conn.settimeout(timeout)
             return _conn
@@ -229,7 +240,7 @@ class AdbClient(object):
             transport (str): {any,usb,local} [default any]
             state (str): {device,recovery,rescue,sideload,bootloader,disconnect} [default device]
             timeout (float): max wait time [default 60]
-        
+
         Raises:
             AdbError, AdbTimeout
         """
@@ -261,7 +272,7 @@ class AdbClient(object):
 
         Returns:
             content adb server returns
-        
+
         Raises:
             AdbTimeout
 
@@ -518,11 +529,11 @@ class AdbDevice(ShellMixin):
     def get_state(self) -> str:
         """ return device state {offline,bootloader,device} """
         return self._get_with_command("get-state")
-    
+
     def get_serialno(self) -> str:
         """ return the real device id, not the connect serial """
         return self._get_with_command("get-serialno")
-    
+
     def get_devpath(self) -> str:
         """ example return: usb:12345678Y """
         return self._get_with_command("get-devpath")
@@ -653,7 +664,7 @@ class AdbDevice(ShellMixin):
         else:
             raise ValueError("Unsupported network type", network)
         return c.conn
-    
+
 
 class Sync():
     def __init__(self, adbclient: AdbClient, serial: str):
