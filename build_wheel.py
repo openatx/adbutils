@@ -1,47 +1,80 @@
 #!/usr/bin/env python3
 # coding: utf-8
 import os
+import requests
 import shutil
 import subprocess
 import sys
-from urllib.request import urlopen
+import zipfile
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIBNAME = "adbutils"
-BINARIES_DIR = os.path.join(ROOT_DIR, "adbutils", "binaries")
+BINARIES_DIR = os.path.join(ROOT_DIR, LIBNAME, "binaries")
 
-
-ADB_VERSION = "1.0.41"
 FNAMES_PER_PLATFORM = {
+    "darwin": ["adb"],
+    "linux": ["adb"],
     "win32": ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"],
-    "osx64": ["adb"],
 }
 
-osxplats = "macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64"
+BINARIES_URL = {
+    "darwin": "https://dl.google.com/android/repository/platform-tools-latest-darwin.zip",
+    "linux": "https://dl.google.com/android/repository/platform-tools-latest-linux.zip",
+    "win32": "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+}
+
+linux_plats = "manylinux_2_24_x86_64.manylinux_2_24_aarch64"
+darwin_plats = "macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64"
 
 WHEEL_BUILDS = {
+    "py3-none-" + darwin_plats: "darwin",
+    # "py3-none-" + linux_plats: "linux",  # look into manylinux wheel builder
     "py3-none-win32": "win32",
     "py3-none-win_amd64": "win32",
-    "py3-none-" + osxplats: "osx64",
 }
+
 
 def copy_binaries(target_dir, platform: str):
     assert os.path.isdir(target_dir)
-    
-    base_url = f"https://github.com/openatx/adb-binaries/raw/master/{ADB_VERSION}"
+
+    base_url = BINARIES_URL[platform]
+    archive_name = os.path.join(target_dir, f'{platform}.zip')
+
+    print("Downloading", base_url, "...", end=" ", flush=True)
+    with open(archive_name, 'wb') as handle:
+        response = requests.get(base_url, stream=True)
+        if not response.ok:
+            print(response)
+        for block in response.iter_content(1024):
+            if not block:
+                break
+            handle.write(block)
+    print("done")
+
     for fname in FNAMES_PER_PLATFORM[platform]:
+        print("Extracting", fname, "...", end=" ")
+        # extract the specified file from the archive
+        member_name = f'platform-tools/{fname}'
+        extract_archive_file(archive_file=archive_name, file=member_name, destination_folder=target_dir)
+        shutil.move(src=os.path.join(target_dir, member_name), dst=os.path.join(target_dir, fname))
+
+        # extracted files
         filename = os.path.join(target_dir, fname)
-        fileurl = "/".join([base_url, platform, fname])
-        
-        print("Downloading", fileurl, "...", end=" ", flush=True)
-        with urlopen(fileurl, timeout=5) as f1:
-            with open(filename, "wb") as f2:
-                shutil.copyfileobj(f1, f2)
-            if fname == "adb":
-                os.chmod(filename, 0o755)
+        if fname == "adb":
+            os.chmod(filename, 0o755)
         print("done")
 
-# copy_binaries(os.path.join(ROOT_DIR, "adbutils", "binaries"), "win32")
+    os.rmdir(path=os.path.join(target_dir, 'platform-tools'))
+    os.remove(path=archive_name)
+
+
+def extract_archive_file(archive_file, file, destination_folder):
+    extension = archive_file.rsplit('.', 1)[-1].lower()
+
+    if extension == 'zip':
+        with zipfile.ZipFile(archive_file, 'r') as archive:
+            archive.extract(member=file, path=destination_folder)
+
 
 def clear_binaries_dir(target_dir):
     assert os.path.isdir(target_dir)
@@ -52,6 +85,7 @@ def clear_binaries_dir(target_dir):
             print("Removing", fname, "...", end=" ")
             os.remove(os.path.join(target_dir, fname))
             print("done")
+
 
 def clean():
     for root, dirs, files in os.walk(ROOT_DIR):
@@ -69,11 +103,12 @@ def clean():
             if fname.endswith((".pyc", ".pyo")):
                 os.remove(os.path.join(root, fname))
                 print("Removing", fname)
-    
+
+
 def build():
     clean()
     # Clear binaries, we don't want them in the reference release
-    clear_binaries_dir(os.path.join(ROOT_DIR, "adbutils", "binaries"))
+    clear_binaries_dir(BINARIES_DIR)
     
     print("Using setup.py to generate wheel ...", end="")
     subprocess.check_output(
