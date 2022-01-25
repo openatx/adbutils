@@ -300,13 +300,15 @@ class AdbClient(object):
               serial: str,
               command: Union[str, list, tuple],
               stream: bool = False,
-              timeout: Optional[float] = None) -> Union[str, _AdbStreamConnection]:
+              timeout: Optional[float] = None,
+              use_transport_id=False) -> Union[str, _AdbStreamConnection]:
         """Run shell in android and return output
         Args:
             serial (str)
             command: list, tuple or str
             stream (bool): return stream instead of string output
             timeout (float or None): only works when stream is False
+            use_transport_id: Interpret serial as transport_id instead of device serial
 
         Returns:
             str or socket
@@ -323,7 +325,11 @@ class AdbClient(object):
         if stream is False and timeout:
             c.conn.settimeout(timeout)
         try:
-            c.send_command("host:transport:" + serial)
+            if use_transport_id:
+                c.send_command("host:transport-id:" + serial)
+            else:
+                c.send_command("host:transport:" + serial)
+
             c.check_okay()
             c.send_command("shell:" + command)
             c.check_okay()
@@ -416,26 +422,33 @@ class AdbClient(object):
             c.send_command(":".join(cmds))
             c.check_okay()
 
-    def reverse(self, serial, remote, local, norebind=False):
+    def reverse(self, serial, remote, local, norebind=False, use_transport_id=False):
         """
         Args:
             serial (str): device serial
             remote, local (str): tcp:<port> or localabstract:<name>
             norebind (bool): fail if already reversed when set to true
+            use_transport_id: Interpret serial as transport_id instead of device serial
 
         Raises:
             AdbError
         """
         with self._connect() as c:
-            c.send_command("host:transport:" + serial)
+            if use_transport_id:
+                c.send_command("host:transport-id:" + serial)
+            else:
+                c.send_command("host:transport:" + serial)
             c.check_okay()
             cmds = ['reverse:forward', remote + ";" + local]
             c.send_command(":".join(cmds))
             c.check_okay()
 
-    def reverse_list(self, serial: Union[None, str] = None):
+    def reverse_list(self, serial: Union[None, str] = None, use_transport_id=False):
         with self._connect() as c:
-            c.send_command("host:transport:" + serial)
+            if use_transport_id:
+                c.send_command("host:transport-id:" + serial)
+            else:
+                c.send_command("host:transport:" + serial)
             c.check_okay()
             c.send_command("reverse:list-forward")
             c.check_okay()
@@ -462,6 +475,22 @@ class AdbClient(object):
                 if parts[1] == 'device':
                     yield AdbDevice(self, parts[0])
 
+    def iter_device_with_transport_id(self):
+        """
+        Returns:
+            iter of AdbDevice
+        """
+        with self._connect() as c:
+            c.send_command("host:devices-l")
+            c.check_okay()
+            output = c.read_string_block()
+            for line in output.splitlines():
+                parts = re.split(r'\s+', line.strip())
+                if len(parts) != 6:
+                    continue
+                if parts[1] == 'device':
+                    yield AdbDevice(self, parts[5].split(':')[1], is_transport_id=True)
+
     @deprecated(deprecated_in="0.3.0",
                 removed_in="0.4.0",
                 current_version=__version__,
@@ -471,6 +500,9 @@ class AdbClient(object):
 
     def device_list(self):
         return list(self.iter_device())
+
+    def device_list_with_transport_id(self):
+        return list(self.iter_device_with_transport_id())
 
     @deprecated(deprecated_in="0.3.0",
                 removed_in="0.4.0",
@@ -499,9 +531,10 @@ class AdbClient(object):
 
 
 class AdbDevice(ShellMixin):
-    def __init__(self, client: AdbClient, serial: str):
+    def __init__(self, client: AdbClient, serial: str, is_transport_id=False):
         self._client = client
         self._serial = serial
+        self._use_transport_id = is_transport_id
         self._properties = {}  # store properties data
 
     @property
@@ -528,7 +561,7 @@ class AdbDevice(ShellMixin):
         return self._get_with_command("get-devpath")
 
     def __repr__(self):
-        return "AdbDevice(serial={})".format(self.serial)
+        return "AdbDevice({}={})".format("transport_id" if self._use_transport_id else "serial", self.serial)
 
     @property
     def sync(self) -> 'Sync':
@@ -587,7 +620,7 @@ class AdbDevice(ShellMixin):
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = subprocess.list2cmdline(cmdargs)
-        ret = self._client.shell(self._serial, cmdargs, stream=stream, timeout=timeout)
+        ret = self._client.shell(self._serial, cmdargs, stream=stream, timeout=timeout, use_transport_id=self._use_transport_id)
         if stream:
             return ret
         return ret.rstrip() if rstrip else ret
@@ -618,10 +651,10 @@ class AdbDevice(ShellMixin):
         return self._client.forward_list(self._serial)
 
     def reverse(self, remote: str, local: str):
-        return self._client.reverse(self._serial, remote, local)
+        return self._client.reverse(self._serial, remote, local, use_transport_id=self._use_transport_id)
 
     def reverse_list(self):
-        return self._client.reverse_list(self._serial)
+        return self._client.reverse_list(self._serial, use_transport_id=self._use_transport_id)
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
@@ -637,7 +670,10 @@ class AdbDevice(ShellMixin):
             AssertionError, ValueError
         """
         c = self._client._connect()
-        c.send_command("host:transport:" + self._serial)
+        if self._transport_id:
+            c.send_command("host:transport-id:" + self._transport_id)
+        else:
+            c.send_command("host:transport:" + self._serial)
         c.check_okay()
         if network == Network.TCP:
             assert isinstance(address, int)
