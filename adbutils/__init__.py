@@ -526,8 +526,8 @@ class AdbClient(object):
             return ds[0]
         return AdbDevice(self, serial)
 
-    def sync(self, serial) -> 'Sync':
-        return Sync(self, serial)
+    def sync(self, serial, is_transport_id=False) -> 'Sync':
+        return Sync(self, serial, is_transport_id)
 
 
 class AdbDevice(ShellMixin):
@@ -565,7 +565,7 @@ class AdbDevice(ShellMixin):
 
     @property
     def sync(self) -> 'Sync':
-        return Sync(self._client, self.serial)
+        return Sync(self._client, self.serial, self._use_transport_id)
 
     @property
     def prop(self) -> "Property":
@@ -692,15 +692,16 @@ class AdbDevice(ShellMixin):
     
 
 class Sync():
-    def __init__(self, adbclient: AdbClient, serial: str):
+    def __init__(self, adbclient: AdbClient, serial: str, is_transport_id=False):
         self._adbclient = adbclient
         self._serial = serial
+        self._is_transport_id = is_transport_id
 
     @contextmanager
     def _prepare_sync(self, path, cmd):
         c = self._adbclient._connect()
         try:
-            c.send_command(":".join(["host", "transport", self._serial]))
+            c.send_command(":".join(["host", "transport-id" if self._is_transport_id else "transport", self._serial]))
             c.check_okay()
             c.send_command("sync:")
             c.check_okay()
