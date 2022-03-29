@@ -6,25 +6,26 @@ from __future__ import print_function
 import datetime
 import enum
 import io
-import pathlib
-import typing
 import json
 import os
+import pathlib
 import re
 import socket
 import stat
 import struct
 import subprocess
+import typing
 from collections import namedtuple
 from contextlib import contextmanager
-from typing import Union, Iterator, Optional
+from typing import Iterator, Optional, Union
 
 import pkg_resources
 import six
+from deprecation import deprecated
+
 from adbutils._utils import get_adb_exe
 from adbutils.errors import AdbError, AdbTimeout
 from adbutils.mixin import ShellMixin
-from deprecation import deprecated
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
