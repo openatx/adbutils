@@ -5,6 +5,9 @@ from __future__ import print_function
 
 import datetime
 import enum
+import io
+import pathlib
+import typing
 import json
 import os
 import re
@@ -134,7 +137,7 @@ class _AdbStreamConnection(object):
             buffer += chunk
             t = n - len(buffer)
         return buffer
-        
+
     def send_command(self, cmd: str):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
@@ -518,11 +521,11 @@ class AdbDevice(ShellMixin):
     def get_state(self) -> str:
         """ return device state {offline,bootloader,device} """
         return self._get_with_command("get-state")
-    
+
     def get_serialno(self) -> str:
         """ return the real device id, not the connect serial """
         return self._get_with_command("get-serialno")
-    
+
     def get_devpath(self) -> str:
         """ example return: usb:12345678Y """
         return self._get_with_command("get-devpath")
@@ -653,7 +656,7 @@ class AdbDevice(ShellMixin):
         else:
             raise ValueError("Unsupported network type", network)
         return c.conn
-    
+
 
 class Sync():
     def __init__(self, adbclient: AdbClient, serial: str):
@@ -699,12 +702,25 @@ class Sync():
                     mtime = datetime.datetime.now()
                 yield FileInfo(mode, size, mtime, name)
 
-    def list(self, path: str):
+    def list(self, path: str) -> typing.List[str]:
         return list(self.iter_directory(path))
 
-    def push(self, src, dst: str, mode: int = 0o755, filesize: int = None):
+    def push(self,
+             src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
+             dst: str,
+             mode: int = 0o755,
+             check: bool = False) -> int:
         # IFREG: File Regular
         # IFDIR: File Directory
+        if isinstance(src, pathlib.Path):
+            src = src.open("rb")
+        elif isinstance(src, str):
+            src = pathlib.Path(src).open("rb")
+        elif isinstance(src, (bytes, bytearray)):
+            src = io.BytesIO(src)
+        else:
+            if not hasattr(src, "read"):
+                raise TypeError("Invalid src type: %s" % type(src))
         path = dst + "," + str(stat.S_IFREG | mode)
         total_size = 0
         with self._prepare_sync(path, "SEND") as c:
@@ -723,11 +739,13 @@ class Sync():
             finally:
                 if hasattr(r, "close"):
                     r.close()
-        # wait until really pushed
-        # if filesize:
-        #     print("Read: %d Copied: %d" % (filesize, total_size), self.stat(dst))
+        if check:
+            file_size = self.stat(dst).size
+            if total_size != file_size:
+                raise AdbError("Push not complete, expect pushed %d, actually pushed %d" % (total_size, file_size))
+        return total_size
 
-    def iter_content(self, path: str):
+    def iter_content(self, path: str) -> typing.Iterator[bytes]:
         with self._prepare_sync(path, "RECV") as c:
             while True:
                 cmd = c.read_string(4)
@@ -745,15 +763,24 @@ class Sync():
                     yield chunk
                 else:
                     raise AdbError("Invalid sync cmd", cmd)
+    
+    def read_bytes(self, path: str) -> bytes:
+        return b''.join(self.iter_content(path))
 
-    def pull(self, src: str, dst: str) -> int:
+    def read_text(self, path: str, encoding: str = 'utf-8') -> str:
+        """ read content of a file """
+        return self.read_bytes(path).decode(encoding=encoding)
+
+    def pull(self, src: str, dst: typing.Union[str, pathlib.Path]) -> int:
         """
         Pull file from device:src to local:dst
 
         Returns:
             file size
         """
-        with open(dst, 'wb') as f:
+        if isinstance(dst, str):
+            dst = pathlib.Path(dst)
+        with dst.open("wb") as f:
             size = 0
             for chunk in self.iter_content(src):
                 f.write(chunk)
