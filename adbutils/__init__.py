@@ -190,6 +190,14 @@ class AdbClient(object):
         self.__port = port
         self.__socket_timeout = socket_timeout
 
+    @property
+    def host(self) -> str:
+        return self.__host
+    
+    @property
+    def port(self) -> int:
+        return self.__port
+        
     def _connect(self, timeout: float = None) -> _AdbStreamConnection:
         """ connect to adb server
         
