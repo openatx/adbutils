@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Created on Fri May 06 2022 19:04:40 by codeskyblue
+"""
+
+__all__ = ['AdbError', 'AdbTimeout', 'AdbInstallError']
+
 import re
 
 

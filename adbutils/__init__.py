@@ -11,6 +11,7 @@ from ._adb import BaseClient
 from ._device import AdbDevice, Sync
 from ._utils import adb_path
 from .errors import *
+from ._proto import *
 
 
 class AdbClient(BaseClient):
