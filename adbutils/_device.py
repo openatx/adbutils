@@ -1,36 +1,384 @@
-# coding: utf-8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Created on Fri May 06 2022 10:33:39 by codeskyblue
+"""
+
+import datetime
+import io
 import json
 import os
+import pathlib
 import re
+import stat
+import struct
+import subprocess
+import tempfile
 import time
 import typing
 import warnings
-from collections import namedtuple
-from datetime import datetime
+from contextlib import contextmanager
+from typing import Optional, Union
 
 import apkutils2
 import requests
+from deprecation import deprecated
 from retry import retry
 
-from adbutils._utils import ReadProgress, humanize
-from adbutils.errors import AdbError, AdbInstallError
+from ._adb import BaseClient
+from ._proto import *
+from ._utils import (APKReader, ReadProgress, adb_path, get_free_port,
+                     humanize, list2cmdline)
+from ._version import __version__
+from .errors import AdbError, AdbInstallError
+from ._adb import AdbConnection
+from PIL import Image, UnidentifiedImageError
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
 
-WindowSize = namedtuple("WindowSize", ['width', 'height'])
+
+class BaseDevice:
+    """ Basic operation for a device """
+    def __init__(self, client: BaseClient, serial: str):
+        self._client = client
+        self._serial = serial
+        self._properties = {}  # store properties data
+
+    @property
+    def serial(self) -> str:
+        return self._serial
+
+    def _get_with_command(self, cmd: str) -> str:
+        with self._client._connect() as c:
+            cmds = ["host-serial", self._serial, cmd]
+            c.send_command(":".join(cmds))
+            c.check_okay()
+            return c.read_string_block()
+
+    def get_state(self) -> str:
+        """ return device state {offline,bootloader,device} """
+        return self._get_with_command("get-state")
+
+    def get_serialno(self) -> str:
+        """ return the real device id, not the connect serial """
+        return self._get_with_command("get-serialno")
+
+    def get_devpath(self) -> str:
+        """ example return: usb:12345678Y """
+        return self._get_with_command("get-devpath")
+
+    def __repr__(self):
+        return "AdbDevice(serial={})".format(self.serial)
+
+    @property
+    def sync(self) -> 'Sync':
+        return Sync(self._client, self.serial)
+
+    @property
+    def prop(self) -> "Property":
+        return Property(self)
+
+    def adb_output(self, *args, **kwargs):
+        """Run adb command use subprocess and get its content
+
+        Returns:
+            string of output
+
+        Raises:
+            EnvironmentError
+        """
+        cmds = [adb_path(), '-s', self._serial
+                ] if self._serial else [adb_path()]
+        cmds.extend(args)
+        cmdline = list2cmdline(map(str, cmds))
+        try:
+            return subprocess.check_output(cmdline,
+                                           stdin=subprocess.DEVNULL,
+                                           stderr=subprocess.STDOUT,
+                                           shell=True).decode('utf-8')
+        except subprocess.CalledProcessError as e:
+            if kwargs.get('raise_error', True):
+                raise EnvironmentError(
+                    "subprocess", cmdline,
+                    e.output.decode('utf-8', errors='ignore'))
+
+    def shell(self,
+              cmdargs: Union[str, list, tuple],
+              stream: bool = False,
+              timeout: Optional[float] = None,
+              rstrip=True) -> str:
+        """Run shell inside device and get it's content
+
+        Args:
+            rstrip (bool): strip the last empty line (Default: True)
+            stream (bool): return stream instead of string output (Default: False)
+            timeout (float): set shell timeout
+
+        Returns:
+            string of output
+
+        Raises:
+
+        Examples:
+            shell("ls -l")
+            shell(["ls", "-l"])
+            shell("ls | grep data")
+        """
+        ret = self._client.shell(self._serial, cmdargs, stream=stream, timeout=timeout)
+        if stream:
+            return ret
+        return ret.rstrip() if rstrip else ret
+
+    @deprecated(deprecated_in="0.2.4",
+                removed_in="0.3.0",
+                current_version=__version__,
+                details="use shell function instead, eg shell(\"ls -l\")")
+    def shell_output(self, *args) -> str:
+        return self._client.shell(self._serial, args)
+
+    def forward(self, local: str, remote: str):
+        return self._client.forward(self._serial, local, remote)
+
+    def forward_port(self, remote: Union[int, str]) -> int:
+        """ forward remote port to local random port """
+        if isinstance(remote, int):
+            remote = "tcp:" + str(remote)
+        for f in self.forward_list():
+            if f.serial == self._serial and f.remote == remote and f.local.startswith(
+                    "tcp:"):
+                return int(f.local[len("tcp:"):])
+        local_port = get_free_port()
+        self._client.forward(self._serial, "tcp:" + str(local_port), remote)
+        return local_port
+
+    def forward_list(self):
+        return self._client.forward_list(self._serial)
+
+    def reverse(self, remote: str, local: str):
+        return self._client.reverse(self._serial, remote, local)
+
+    def reverse_list(self):
+        return self._client.reverse_list(self._serial)
+
+    def push(self, local: str, remote: str):
+        self.adb_output("push", local, remote)
+
+    def create_connection(self, network: Network, address: Union[int, str]):
+        """
+        Used to connect a socket (unix of tcp) on the device
+
+        Returns:
+            socket object
+
+        Raises:
+            AssertionError, ValueError
+        """
+        c = self._client._connect()
+        c.send_command("host:transport:" + self._serial)
+        c.check_okay()
+        if network == Network.TCP:
+            assert isinstance(address, int)
+            c.send_command("tcp:" + str(address))
+            c.check_okay()
+        elif network in [Network.UNIX, Network.LOCAL_ABSTRACT]:
+            assert isinstance(address, str)
+            c.send_command("localabstract:" + address)
+            c.check_okay()
+        elif network in [Network.LOCAL_FILESYSTEM, Network.LOCAL, Network.DEV, Network.LOCAL_RESERVED]:
+            c.send_command(network + ":" + address)
+            c.check_okay()
+        else:
+            raise ValueError("Unsupported network type", network)
+        return c.conn
 
 
-class ShellMixin(object):
+class Property():
+    def __init__(self, d: BaseDevice):
+        self._d = d
+
+    def __str__(self):
+        return f"product:{self.name} model:{self.model} device:{self.device}"
+
+    def get(self, name: str, cache=True) -> str:
+        if cache and name in self._d._properties:
+            return self._d._properties[name]
+        value = self._d._properties[name] = self._d.shell(['getprop', name]).strip()
+        return value
+
+    @property
+    def name(self):
+        return self.get("ro.product.name", cache=True)
+
+    @property
+    def model(self):
+        return self.get("ro.product.model", cache=True)
+
+    @property
+    def device(self):
+        return self.get("ro.product.device", cache=True)
+
+
+_OKAY = "OKAY"
+_FAIL = "FAIL"
+_DENT = "DENT"  # Directory Entity
+_DONE = "DONE"
+_DATA = "DATA"
+
+
+class Sync():
+    def __init__(self, adbclient: BaseClient, serial: str):
+        self._adbclient = adbclient
+        self._serial = serial
+
+    @contextmanager
+    def _prepare_sync(self, path: str, cmd: str):
+        c = self._adbclient._connect()
+        try:
+            c.send_command(":".join(["host", "transport", self._serial]))
+            c.check_okay()
+            c.send_command("sync:")
+            c.check_okay()
+            # {COMMAND}{LittleEndianPathLength}{Path}
+            c.conn.send(
+                cmd.encode("utf-8") + struct.pack("<I", len(path)) +
+                path.encode("utf-8"))
+            yield c
+        finally:
+            c.close()
+
+    def stat(self, path: str) -> FileInfo:
+        with self._prepare_sync(path, "STAT") as c:
+            assert "STAT" == c.read_string(4)
+            mode, size, mtime = struct.unpack("<III", c.conn.recv(12))
+            # when mtime is 0, windows will error
+            mdtime = datetime.datetime.fromtimestamp(mtime) if mtime else None
+            return FileInfo(mode, size, mdtime, path)
+
+    def iter_directory(self, path: str):
+        with self._prepare_sync(path, "LIST") as c:
+            while 1:
+                response = c.read_string(4)
+                if response == _DONE:
+                    break
+                mode, size, mtime, namelen = struct.unpack(
+                    "<IIII", c.conn.recv(16))
+                name = c.read_string(namelen)
+                try:
+                    mtime = datetime.datetime.fromtimestamp(mtime)
+                except OSError:  # bug in Python 3.6
+                    mtime = datetime.datetime.now()
+                yield FileInfo(mode, size, mtime, name)
+
+    def list(self, path: str) -> typing.List[str]:
+        return list(self.iter_directory(path))
+
+    def push(self,
+             src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
+             dst: str,
+             mode: int = 0o755,
+             check: bool = False) -> int:
+        # IFREG: File Regular
+        # IFDIR: File Directory
+        if isinstance(src, pathlib.Path):
+            src = src.open("rb")
+        elif isinstance(src, str):
+            src = pathlib.Path(src).open("rb")
+        elif isinstance(src, (bytes, bytearray)):
+            src = io.BytesIO(src)
+        else:
+            if not hasattr(src, "read"):
+                raise TypeError("Invalid src type: %s" % type(src))
+        path = dst + "," + str(stat.S_IFREG | mode)
+        total_size = 0
+        with self._prepare_sync(path, "SEND") as c:
+            r = src if hasattr(src, "read") else open(src, "rb")
+            try:
+                while True:
+                    chunk = r.read(4096)
+                    if not chunk:
+                        print("d:", datetime)
+                        mtime = int(datetime.datetime.now().timestamp())
+                        c.conn.send(b"DONE" + struct.pack("<I", mtime))
+                        break
+                    c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
+                    c.conn.send(chunk)
+                    total_size += len(chunk)
+                assert c.read_string(4) == _OKAY
+            finally:
+                if hasattr(r, "close"):
+                    r.close()
+        if check:
+            file_size = self.stat(dst).size
+            if total_size != file_size:
+                raise AdbError("Push not complete, expect pushed %d, actually pushed %d" % (total_size, file_size))
+        return total_size
+
+    def iter_content(self, path: str) -> typing.Iterator[bytes]:
+        with self._prepare_sync(path, "RECV") as c:
+            while True:
+                cmd = c.read_string(4)
+                if cmd == _FAIL:
+                    str_size = struct.unpack("<I", c.read(4))[0]
+                    error_message = c.read_string(str_size)
+                    raise AdbError(error_message)
+                elif cmd == _DONE:
+                    break
+                elif cmd == _DATA:
+                    chunk_size = struct.unpack("<I", c.read(4))[0]
+                    chunk = c.read(chunk_size)
+                    if len(chunk) != chunk_size:
+                        raise RuntimeError("read chunk missing")
+                    yield chunk
+                else:
+                    raise AdbError("Invalid sync cmd", cmd)
+    
+    def read_bytes(self, path: str) -> bytes:
+        return b''.join(self.iter_content(path))
+
+    def read_text(self, path: str, encoding: str = 'utf-8') -> str:
+        """ read content of a file """
+        return self.read_bytes(path).decode(encoding=encoding)
+
+    def pull(self, src: str, dst: typing.Union[str, pathlib.Path]) -> int:
+        """
+        Pull file from device:src to local:dst
+
+        Returns:
+            file size
+        """
+        if isinstance(dst, str):
+            dst = pathlib.Path(dst)
+        with dst.open("wb") as f:
+            size = 0
+            for chunk in self.iter_content(src):
+                f.write(chunk)
+                size += len(chunk)
+            return size
+
+
+class AdbDevice(BaseDevice):
     """ provide custom functions for some complex operations """
-    def _run(self, cmd) -> str:
-        return self.shell(cmd)
 
-    def say_hello(self) -> str:
-        content = 'hello from {}'.format(self.serial)
-        return self._run(['echo', content])
+    def screenshot(self) -> Image.Image:
+        """ not thread safe """
+        try:
+            inner_tmp_path = "/sdcard/tmp001.png"
+            self.shell(['rm', inner_tmp_path])
+            self.shell(["screencap", "-p", inner_tmp_path])
 
+            with tempfile.TemporaryDirectory() as tmpdir:
+                target_path = os.path.join(tmpdir, "tmp001.png")
+                self.sync.pull(inner_tmp_path, target_path)
+                im = Image.open(target_path)
+                im.load()
+                self._width, self._height = im.size
+                return im.convert("RGB")
+        except UnidentifiedImageError:
+            w, h = self.window_size()
+            return Image.new("RGB", (w, h), (220, 120, 100))
+            
     def switch_screen(self, status: bool):
         """
         turn screen on/off
@@ -64,8 +412,8 @@ class ShellMixin(object):
             base_am_cmd += ['false']
 
         # TODO better idea about return value?
-        self._run(base_setting_cmd)
-        return self._run(base_am_cmd)
+        self.shell(base_setting_cmd)
+        return self.shell(base_am_cmd)
 
     def switch_wifi(self, status: bool) -> str:
         """
@@ -74,16 +422,13 @@ class ShellMixin(object):
         Args:
             status (bool)
         """
-        base_cmd = ['svc', 'wifi']
-        cmd_dict = {
-            True: base_cmd + ['enable'],
-            False: base_cmd + ['disable'],
-        }
-        return self._run(cmd_dict[status])
+        arglast = 'enable' if status else 'disable'
+        cmdargs = ['svc', 'wifi', arglast]
+        return self.shell(cmdargs)
 
     def keyevent(self, key_code: typing.Union[int, str]) -> str:
         """ adb _run input keyevent KEY_CODE """
-        return self._run(['input', 'keyevent', str(key_code)])
+        return self.shell(['input', 'keyevent', str(key_code)])
 
     def click(self, x, y):
         """
@@ -93,7 +438,7 @@ class ShellMixin(object):
             x, y: int
         """
         x, y = map(str, [x, y])
-        return self._run(['input', 'tap', x, y])
+        return self.shell(['input', 'tap', x, y])
 
     def swipe(self, sx, sy, ex, ey, duration: float = 1.0):
         """
@@ -104,7 +449,7 @@ class ShellMixin(object):
             ex, ey: end point(x, y)
         """
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
-        return self._run(
+        return self.shell(
             ['input', 'swipe', x1, y1, x2, y2,
              str(int(duration * 1000))])
 
@@ -116,7 +461,7 @@ class ShellMixin(object):
             text: text to be type
         """
         escaped_text = self._escape_special_characters(text)
-        return self._run(['input', 'text', escaped_text])
+        return self.shell(['input', 'text', escaped_text])
 
     @staticmethod
     def _escape_special_characters(text):
@@ -169,11 +514,27 @@ class ShellMixin(object):
         get device wlan ip
 
         Raises:
-            IndexError
+            AdbError
         """
-        # TODO better design?
-        result = self._run(['ifconfig', 'wlan0'])
-        return re.findall(r'inet\s*addr:(.*?)\s', result, re.DOTALL)[0]
+        result = self.shell(['ifconfig', 'wlan0'])
+        m = re.search(r'inet\s*addr:(.*?)\s', result, re.DOTALL)
+        if m:
+            return m.group(1)
+        
+        # Huawei P30, has no ifconfig
+        result = self.shell(['ip', 'addr', 'show', 'dev', 'wlan0'])
+        m = re.search(r'inet (\d+.*?)/\d+', result)
+        if m:
+            return m.group(1)
+        
+        # On VirtualDevice, might use eth0
+        result = self.shell(['ifconfig', 'eth0'])
+        m = re.search(r'inet\s*addr:(.*?)\s', result, re.DOTALL)
+        if m:
+            return m.group(1)
+        
+        raise AdbError("fail to parse wlan ip")
+
 
     @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
     def install(self,
@@ -304,11 +665,11 @@ class ShellMixin(object):
             AdbInstallError
         """
         args = ["pm", "install"] + flags + [remote_path]
-        output = self._run(args)
+        output = self.shell(args)
         if "Success" not in output:
             raise AdbInstallError(output)
         if clean:
-            self._run(["rm", remote_path])
+            self.shell(["rm", remote_path])
 
     def uninstall(self, pkg_name: str):
         """
@@ -317,18 +678,18 @@ class ShellMixin(object):
         Args:
             pkg_name (str): package name
         """
-        return self._run(["pm", "uninstall", pkg_name])
+        return self.shell(["pm", "uninstall", pkg_name])
 
     def getprop(self, prop: str) -> str:
-        return self._run(['getprop', prop]).strip()
+        return self.shell(['getprop', prop]).strip()
 
-    def list_packages(self) -> list:
+    def list_packages(self) -> typing.List[str]:
         """
         Returns:
             list of package names
         """
         result = []
-        output = self._run(["pm", "list", "packages"])
+        output = self.shell(["pm", "list", "packages"])
         for m in re.finditer(r'^package:([^\s]+)\r?$', output, re.M):
             result.append(m.group(1))
         return list(sorted(result))
@@ -340,7 +701,7 @@ class ShellMixin(object):
         Returns:
             None or dict(version_name, version_code, signature)
         """
-        output = self._run(['dumpsys', 'package', package_name])
+        output = self.shell(['dumpsys', 'package', package_name])
         m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
         version_name = m.group('name') if m else ""
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
@@ -431,9 +792,9 @@ class ShellMixin(object):
         """ start app with "am start" or "monkey"
         """
         if activity:
-            self._run(['am', 'start', '-n', package_name + "/" + activity])
+            self.shell(['am', 'start', '-n', package_name + "/" + activity])
         else:
-            self._run([
+            self.shell([
                 "monkey", "-p", package_name, "-c",
                 "android.intent.category.LAUNCHER", "1"
             ])
@@ -441,29 +802,29 @@ class ShellMixin(object):
     def app_stop(self, package_name: str):
         """ stop app with "am force-stop"
         """
-        self._run(['am', 'force-stop', package_name])
+        self.shell(['am', 'force-stop', package_name])
 
     def app_clear(self, package_name: str):
-        self._run(["pm", "clear", package_name])
+        self.shell(["pm", "clear", package_name])
 
     def is_screen_on(self):
-        output = self._run(["dumpsys", "power"])
+        output = self.shell(["dumpsys", "power"])
         return 'mHoldingDisplaySuspendBlocker=true' in output
 
     def open_browser(self, url: str):
         if not re.match("^https?://", url):
             url = "https://" + url
-        self._run(
+        self.shell(
             ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
 
-    def dump_hierarchy(self):
+    def dump_hierarchy(self) -> str:
         """
         uiautomator dump
 
         Returns:
             content of xml
         """
-        output = self._run(
+        output = self.shell(
             'uiautomator dump /data/local/tmp/uidump.xml && echo success')
         if "success" not in output:
             raise RuntimeError("uiautomator dump failed")
@@ -493,7 +854,7 @@ class ShellMixin(object):
         _focusedRE = re.compile(
             r'mCurrentFocus=Window{.*\s+(?P<package>[^\s]+)/(?P<activity>[^\s]+)\}'
         )
-        m = _focusedRE.search(self._run(['dumpsys', 'window', 'windows']))
+        m = _focusedRE.search(self.shell(['dumpsys', 'window', 'windows']))
         if m:
             return dict(package=m.group('package'),
                         activity=m.group('activity'))
@@ -502,7 +863,7 @@ class ShellMixin(object):
         _activityRE = re.compile(
             r'ACTIVITY (?P<package>[^\s]+)/(?P<activity>[^/\s]+) \w+ pid=(?P<pid>\d+)'
         )
-        output = self._run(['dumpsys', 'activity', 'top'])
+        output = self.shell(['dumpsys', 'activity', 'top'])
         ms = _activityRE.finditer(output)
         ret = None
         for m in ms:
@@ -516,6 +877,7 @@ class ShellMixin(object):
     def remove(self, path: str):
         """ rm device file """
         self.shell(["rm", path])
+    
 
     def screenrecord(self, remote_path=None, no_autostart=False):
         """
@@ -527,7 +889,7 @@ class ShellMixin(object):
 
 
 class _ScreenRecord():
-    def __init__(self, d, remote_path=None, autostart=False):
+    def __init__(self, d: AdbDevice, remote_path=None, autostart=False):
         """ The maxium record time is 3 minutes """
         self._d = d
         if not remote_path:
@@ -545,7 +907,7 @@ class _ScreenRecord():
         if self._started:
             warnings.warn("screenrecord already started", UserWarning)
             return
-        self._stream = self._d.shell(["screenrecord", self._remote_path],
+        self._stream: AdbConnection = self._d.shell(["screenrecord", self._remote_path],
                                      stream=True)
         self._started = True
 
@@ -556,7 +918,7 @@ class _ScreenRecord():
 
         if self._stopped:
             return
-        self._stream.send("\003")
+        self._stream.send(b"\003")
         self._stream.read_until_close()
         self._stream.close()
         self._stopped = True

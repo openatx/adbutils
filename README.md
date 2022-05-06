@@ -223,6 +223,10 @@ AdbUtils provided some custom functions for some complex operations.
 You can use it like this:
 
 ```python
+# save screenshot
+pilimg = d.screenshot()
+pilimg.save("screenshot.jpg")
+
 # install apk
 d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
@@ -272,7 +276,7 @@ r.start() # start record
 r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remove video from device
 ```
 
-For further usage, please read [mixin.py](adbutils/mixin.py) for details.
+For further usage, please read [_device.py](adbutils/_device.py) for details.
 
 ## Run in command line 命令行使用
 
@@ -388,7 +392,7 @@ Record video using screenrecord
 stream = d.shell("screenrecord /sdcard/s.mp4", stream=True)
 time.sleep(3) # record for 3 seconds
 with stream:
-	stream.send("\003") # send Ctrl+C
+	stream.send(b"\003") # send Ctrl+C
 	stream.read_until_close()
 
 start = time.time()

@@ -6,7 +6,7 @@ from adbutils import adb
 
 
 def test_server_version():
-    client = adbutils.AdbClient("127.0.0.1", 5037)
+    client = adbutils.BaseClient("127.0.0.1", 5037)
     version = client.server_version()
     assert isinstance(version, int)
 

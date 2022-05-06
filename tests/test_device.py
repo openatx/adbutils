@@ -12,10 +12,6 @@ import adbutils
 from adbutils import AdbDevice
 
 
-def test_say_hello(device: AdbDevice):
-    assert device.say_hello() == 'hello from {}'.format(device.serial)
-
-
 def test_keyevent(device: AdbDevice):
     # make sure no error raised
     device.keyevent(4)
@@ -49,7 +45,6 @@ def test_set_ime(device: AdbDevice):
     pass
 
 
-@pytest.mark.skip("ifconfig is not working for all device")
 def test_wlan_ip(device: AdbDevice):
     device.switch_airplane(True)
     device.switch_wifi(True)
@@ -63,6 +58,7 @@ def test_current_app(device: AdbDevice):
     assert 'package' in info
     assert 'activity' in info
 
+
 def test_app_start_stop(device: AdbDevice):
     d = device
     package_name = "io.appium.android.apis"
@@ -74,3 +70,8 @@ def test_app_start_stop(device: AdbDevice):
     d.app_stop(package_name)
     time.sleep(.5)
     assert device.current_app()['package'] != package_name
+
+
+def test_screenshot(device: AdbDevice):
+    im = device.screenshot()
+    assert im.mode == "RGB"

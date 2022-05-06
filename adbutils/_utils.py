@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shlex
 import socket
 import subprocess
 import sys
@@ -19,6 +20,20 @@ def humanize(n: int) -> str:
     return '%.1f MB' % (float(n) / MB)
 
 
+def get_free_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('127.0.0.1', 0))
+    try:
+        return s.getsockname()[1]
+    finally:
+        s.close()
+
+
+def list2cmdline(args: typing.Union[list, tuple]):
+    """ do not use subprocess.list2cmdline, use this instead """
+    return ' '.join(map(shlex.quote, args))
+
+
 def current_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -30,7 +45,7 @@ def current_ip():
     finally:
         s.close()
 
-def get_adb_exe():
+def adb_path():
     # 1. find in $PATH
     exe = whichcraft.which("adb")
     if exe and _is_valid_exe(exe):

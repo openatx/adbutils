@@ -16,19 +16,15 @@ import json
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
-import time
 import zipfile
 
-import apkutils2
 import requests
 
 import adbutils
 from adbutils import adb as adbclient
-from adbutils._utils import ReadProgress, current_ip, humanize, APKReader
-from adbutils.errors import AdbError, AdbInstallError
+from adbutils._utils import ReadProgress, current_ip, APKReader
 
 
 def _setup_minicap(d: adbutils.AdbDevice):
