@@ -718,11 +718,11 @@ class AdbDevice(BaseDevice):
 
         time_regex = r"[-\d]+\s+[:\d]+"
         m = re.compile(f"firstInstallTime=({time_regex})").search(output)
-        first_install_time = datetime.strptime(
+        first_install_time = datetime.datetime.strptime(
             m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
 
         m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
-        last_update_time = datetime.strptime(
+        last_update_time = datetime.datetime.strptime(
             m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
 
         return dict(package_name=package_name,
