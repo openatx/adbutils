@@ -1075,14 +1075,17 @@ class _ScreenRecord():
         if self._started:
             warnings.warn("screenrecord already started", UserWarning)
             return
-        self._d.sync.push(textwrap.dedent("""#!/system/bin/sh
+        # end first line with \ to avoid the empty line!
+        script_content = textwrap.dedent("""\
+        #!/system/bin/sh
         # generate by adbutils
         screenrecord "$1" &
         PID=$!
         read ANY
         kill -INT $PID
         wait
-        """).encode('utf-8'), "/sdcard/adbutils-screenrecord.sh")
+        """).encode('utf-8')
+        self._d.sync.push(script_content, "/sdcard/adbutils-screenrecord.sh")
         self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/my-screenrecord.sh", self._remote_path],
                                      stream=True)
         self._started = True
