@@ -13,7 +13,7 @@ jobs:
       with:
         python-version: 3.7
     - name: Install pypa/build
-      run: >-
+      run: |
         python3 -m pip install wheel
         python3 -m pip install -r requirements.txt
     - name: Build targz and wheel
