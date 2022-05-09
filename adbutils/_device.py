@@ -10,6 +10,7 @@ import json
 import os
 import pathlib
 import re
+import socket
 import stat
 import struct
 import subprocess
@@ -41,21 +42,49 @@ _DISPLAY_RE = re.compile(
 
 class BaseDevice:
     """ Basic operation for a device """
-    def __init__(self, client: BaseClient, serial: str):
+    def __init__(self, client: BaseClient, serial: str = None, transport_id: int = None):
         self._client = client
         self._serial = serial
+        self._transport_id: int = transport_id
         self._properties = {}  # store properties data
+
+        if not serial and not transport_id:
+            raise AdbError("serial, transport_id must set atleast one")
 
     @property
     def serial(self) -> str:
         return self._serial
 
-    def _get_with_command(self, cmd: str) -> str:
-        with self._client._connect() as c:
-            cmds = ["host-serial", self._serial, cmd]
-            c.send_command(":".join(cmds))
+    def open_transport(self, command: str = None, timeout: float = None) -> AdbConnection:
+        # connect has it own timeout
+        c = self._client._connect()
+        if timeout:
+            c.conn.settimeout(timeout)
+
+        if command:
+            if self._transport_id:
+                c.send_command(f"host-transport-id:{self._transport_id}:{command}")
+            elif self._serial:
+                c.send_command(f"host-serial:{self._serial}:{command}")
+            else:
+                raise RuntimeError
             c.check_okay()
-            return c.read_string_block()
+        else:
+            if self._transport_id:
+                c.send_command(f"host:transport-id:{self._transport_id}")
+            elif self._serial:
+                # host:tport:serial:xxx is also fine, but receive 12 bytes
+                # recv: 4f 4b 41 59 14 00 00 00 00 00 00 00              OKAY........
+                # so here use host:transport
+                c.send_command(f"host:transport:{self._serial}")
+            else:
+                raise RuntimeError
+            c.check_okay()
+        return c
+        
+    def _get_with_command(self, cmd: str) -> str:
+        c = self.open_transport(cmd)
+        return c.read_string_block()
 
     def get_state(self) -> str:
         """ return device state {offline,bootloader,device} """
@@ -68,6 +97,13 @@ class BaseDevice:
     def get_devpath(self) -> str:
         """ example return: usb:12345678Y """
         return self._get_with_command("get-devpath")
+    
+    def get_features(self) -> str:
+        """
+        Return example:
+            'abb_exec,fixed_push_symlink_timestamp,abb,stat_v2,apex,shell_v2,fixed_push_mkdir,cmd'
+        """
+        return self._get_with_command("features")
 
     def __repr__(self):
         return "AdbDevice(serial={})".format(self.serial)
@@ -108,7 +144,7 @@ class BaseDevice:
               cmdargs: Union[str, list, tuple],
               stream: bool = False,
               timeout: Optional[float] = None,
-              rstrip=True) -> str:
+              rstrip=True) -> typing.Union[AdbConnection, str]:
         """Run shell inside device and get it's content
 
         Args:
@@ -117,7 +153,8 @@ class BaseDevice:
             timeout (float): set shell timeout
 
         Returns:
-            string of output
+            string of output when stream is False
+            AdbConnection when stream is True
 
         Raises:
             AdbTimeout
@@ -127,10 +164,17 @@ class BaseDevice:
             shell(["ls", "-l"])
             shell("ls | grep data")
         """
-        ret = self._client.shell(self._serial, cmdargs, stream=stream, timeout=timeout)
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = list2cmdline(cmdargs)
         if stream:
-            return ret
-        return ret.rstrip() if rstrip else ret
+            timeout = None
+        c = self.open_transport(timeout=timeout)
+        c.send_command("shell:" + cmdargs)
+        c.check_okay()
+        if stream:
+            return c
+        output = c.read_until_close()
+        return output.rstrip() if rstrip else output
 
     def shell2(self,
               cmdargs: Union[str, list, tuple],
@@ -159,34 +203,69 @@ class BaseDevice:
                            returncode=returncoode,
                            output=output[:rindex])
 
-    def forward(self, local: str, remote: str):
-        return self._client.forward(self._serial, local, remote)
+    def forward(self, local: str, remote: str, norebind: bool = False):
+        args = ["forward"]
+        if norebind:
+            args.append("norebind")
+        args.append(local+";" + remote)
+        self.open_transport(":".join(args))
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """ forward remote port to local random port """
         if isinstance(remote, int):
             remote = "tcp:" + str(remote)
         for f in self.forward_list():
-            if f.serial == self._serial and f.remote == remote and f.local.startswith(
-                    "tcp:"):
+            if f.serial == self._serial and f.remote == remote and f.local.startswith("tcp:"):
                 return int(f.local[len("tcp:"):])
         local_port = get_free_port()
-        self._client.forward(self._serial, "tcp:" + str(local_port), remote)
+        self.forward("tcp:" + str(local_port), remote)
         return local_port
 
     def forward_list(self):
+        c = self.open_transport("list-forward")
+        content = c.read_string_block()
+        for line in content.splitlines():
+            parts = line.split()
+            if len(parts) != 3:
+                continue
+            yield ForwardItem(*parts)
         return self._client.forward_list(self._serial)
 
-    def reverse(self, remote: str, local: str):
-        return self._client.reverse(self._serial, remote, local)
+    def reverse(self, remote: str, local: str, norebind: bool = False):
+        """
+        Args:
+            serial (str): device serial
+            remote, local (str):
+                - tcp:<port>
+                - localabstract:<unix domain socket name>
+                - localreserved:<unix domain socket name>
+                - localfilesystem:<unix domain socket name>
+            norebind (bool): fail if already reversed when set to true
+
+        Raises:
+            AdbError
+        """
+        args = ["forward"]
+        if norebind:
+            args.append("norebind")
+        args.append(local+";" + remote)
+        self.open_transport(":".join(args))
 
     def reverse_list(self):
-        return self._client.reverse_list(self._serial)
+        c = self.open_transport()
+        c.send_command("reverse:list-forward")
+        c.check_okay()
+        content = c.read_string_block()
+        for line in content.splitlines():
+            parts = line.split()
+            if len(parts) != 3:
+                continue
+            yield ReverseItem(*parts[1:])
 
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
 
-    def create_connection(self, network: Network, address: Union[int, str]):
+    def create_connection(self, network: Network, address: Union[int, str]) -> socket.socket:
         """
         Used to connect a socket (unix of tcp) on the device
 
@@ -196,9 +275,7 @@ class BaseDevice:
         Raises:
             AssertionError, ValueError
         """
-        c = self._client._connect()
-        c.send_command("host:transport:" + self._serial)
-        c.check_okay()
+        c = self.open_transport()
         if network == Network.TCP:
             assert isinstance(address, int)
             c.send_command("tcp:" + str(address))
@@ -215,12 +292,27 @@ class BaseDevice:
         return c.conn
 
     def root(self):
-        """ just implemented, not tested """
+        """ restart adbd as root
+        
+        Return example:
+            cannot run as root in production builds
+        """
         # Ref: https://github.com/Swind/pure-python-adb/blob/master/ppadb/command/transport/__init__.py#L179
-        with self._client._connect() as c:
-            c.send_command("root:")
-            c.check_okay()
-            return c.read_string_block()
+        c = self.open_transport()
+        c.send_command("root:")
+        c.check_okay()
+        return c.read_string_block()
+    
+    def tcpip(self, port: int):
+        """ restart adbd listening on TCP on PORT
+
+        Return example:
+            restarting in TCP mode port: 5555
+        """
+        c = self.open_transport()
+        c.send_command("tcpip:" + str(port))
+        c.check_okay()
+        return c.read_until_close()
 
 
 class Property():
@@ -873,7 +965,7 @@ class AdbDevice(BaseDevice):
         return buf.decode("utf-8")
 
     @deprecated(deprecated_in="0.15.0",
-                removed_in="0.1.0",
+                removed_in="1.0.0",
                 current_version=__version__,
                 details="Use app_current instead")
     def current_app(self) -> dict:

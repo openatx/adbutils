@@ -7,17 +7,32 @@ import io
 import os
 import typing
 
+from deprecation import deprecated
+
+from ._adb import AdbConnection
 from ._adb import BaseClient as _BaseClient
 from ._device import AdbDevice, Sync
-from ._utils import adb_path
-from .errors import *
 from ._proto import *
+from ._utils import adb_path
+from ._version import __version__
+from .errors import *
 
 
 class AdbClient(_BaseClient):
     def sync(self, serial: str) -> Sync:
         return Sync(self, serial)
-    
+
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="1.0.0",
+                current_version=__version__,
+                details="use AdbDevice.shell instead")
+    def shell(self,
+              serial: str,
+              command: typing.Union[str, list, tuple],
+              stream: bool = False,
+              timeout: typing.Optional[float] = None) -> typing.Union[str, AdbConnection]:
+        return self.device(serial).shell(command, stream=stream, timeout=timeout)
+
     def iter_device(self) -> typing.Iterator:
         """
         Returns:
@@ -32,15 +47,21 @@ class AdbClient(_BaseClient):
                 if len(parts) != 2:
                     continue
                 if parts[1] == 'device':
-                    yield AdbDevice(self, parts[0])
-    
+                    yield AdbDevice(self, serial=parts[0])
+
     def device_list(self):
         return list(self.iter_device())
 
-    def device(self, serial: str=None) -> 'AdbDevice':
-        if not serial:
-            serial = os.environ.get("ANDROID_SERIAL")
+    def device(self,
+               serial: str = None,
+               transport_id: int = None) -> 'AdbDevice':
+        if serial:
+            return AdbDevice(self, serial=serial)
+        
+        if transport_id:
+            return AdbDevice(self, transport_id=transport_id)
 
+        serial = os.environ.get("ANDROID_SERIAL")
         if not serial:
             ds = self.device_list()
             if len(ds) == 0:
@@ -51,7 +72,7 @@ class AdbClient(_BaseClient):
                 )
             return ds[0]
         return AdbDevice(self, serial)
-    
+
 
 
 adb = AdbClient()

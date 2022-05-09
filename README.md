@@ -64,6 +64,9 @@ for d in adb.devices():
 
 d = adb.device(serial="33ff22xx")
 
+# or
+d = adb.device(transport_id=24) # transport_id can be found in: adb devices -l
+
 # You do not need to offer serial if only one device connected
 # RuntimeError will be raised if multi device connected
 d = adb.device()
@@ -269,7 +272,14 @@ d.send_keys("hello world$%^&*") # simulate: adb shell input text "hello%sworld\%
 d.open_browser("https://www.baidu.com") # 打开百度
 # There still too many functions, please see source codes
 
+# check if screen is on
 d.is_screen_on() # 返回屏幕是否亮屏 True or False
+
+# adb root
+d.root()
+
+# adb tcpip <port>
+d.tcpip(5555)
 ```
 
 Screenrecord

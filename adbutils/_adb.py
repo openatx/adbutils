@@ -8,18 +8,17 @@ import os
 import socket
 import subprocess
 import typing
-from typing import Iterator, Optional, Union
+import weakref
+from typing import Iterator, Union
 
-import six
 from deprecation import deprecated
 
 from adbutils._utils import adb_path
 from adbutils.errors import AdbError, AdbTimeout
 
+from ._proto import *
 from ._utils import list2cmdline
 from ._version import __version__
-from ._proto import *
-
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -44,6 +43,8 @@ class AdbConnection(object):
         self.__port = port
         self.__conn = self._safe_connect()
 
+        self._finalizer = weakref.finalize(self, self.conn.close)
+
     def _create_socket(self):
         adb_host = self.__host
         adb_port = self.__port
@@ -62,8 +63,12 @@ class AdbConnection(object):
             subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             return self._create_socket()
 
+    @property
+    def closed(self) -> bool:
+        return not self._finalizer.alive
+
     def close(self):
-        self.__conn.close()
+        self._finalizer()
 
     def __enter__(self):
         return self
@@ -128,7 +133,7 @@ class AdbConnection(object):
             raise AdbError(self.read_string_block())
         elif data == _OKAY:
             return
-        raise AdbError("Unknown data: %s" % data)
+        raise AdbError("Unknown data: %r" % data)
 
 
 class BaseClient(object):
@@ -264,51 +269,6 @@ class BaseClient(object):
             if raise_error:
                 raise
 
-    def shell(self,
-              serial: str,
-              command: Union[str, list, tuple],
-              stream: bool = False,
-              timeout: Optional[float] = None) -> Union[str, AdbConnection]:
-        """Run shell in android and return output
-        Args:
-            serial (str)
-            command: list, tuple or str
-            stream (bool): return stream instead of string output
-            timeout (float or None): only works when stream is False
-
-        Returns:
-            str or socket
-
-        Raises:
-            AdbTimeout
-        """
-        assert isinstance(serial, six.string_types)
-        if isinstance(command, (list, tuple)):
-            command = list2cmdline(command)
-        assert isinstance(command, six.string_types)
-        c = self._connect()
-        # when no response in timeout, socket.timeout will raise
-        if stream is False and timeout:
-            c.conn.settimeout(timeout)
-        try:
-            c.send_command("host:transport:" + serial)
-            c.check_okay()
-            c.send_command("shell:" + command)
-            c.check_okay()
-            if stream:
-                return c
-            try:
-                return c.read_until_close()
-            except socket.timeout:
-                raise AdbTimeout("shell exec timeout", "CMD={!r} TIMEOUT={:.1f}".format(command, timeout))
-        except:
-            if stream:
-                c.close()
-            raise
-        finally:
-            if not stream:
-                c.close()
-
     def track_devices(self) -> Iterator[DeviceEvent]:
         """
         Report device state when changes
@@ -350,6 +310,9 @@ class BaseClient(object):
         for d in set(curr).difference(orig):
             yield DeviceEvent(True, d.serial, d.status)
 
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="1.0.0",
+                current_version=__version__)
     def forward_list(self, serial: Union[None, str] = None):
         with self._connect() as c:
             list_cmd = "host:list-forward"
@@ -366,6 +329,9 @@ class BaseClient(object):
                     continue
                 yield ForwardItem(*parts)
 
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="1.0.0",
+                current_version=__version__)
     def forward(self, serial, local, remote, norebind=False):
         """
         Args:
@@ -384,6 +350,9 @@ class BaseClient(object):
             c.send_command(":".join(cmds))
             c.check_okay()
 
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="1.0.0",
+                current_version=__version__)
     def reverse(self, serial, remote, local, norebind=False):
         """
         Args:
@@ -401,6 +370,9 @@ class BaseClient(object):
             c.send_command(":".join(cmds))
             c.check_okay()
 
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="1.0.0",
+                current_version=__version__)
     def reverse_list(self, serial: Union[None, str] = None):
         with self._connect() as c:
             c.send_command("host:transport:" + serial)

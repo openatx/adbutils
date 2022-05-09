@@ -11,7 +11,7 @@ import time
 import pytest
 
 import adbutils
-from adbutils import AdbDevice
+from adbutils import AdbDevice, Network
 
 
 def test_shell(device: AdbDevice):
@@ -22,6 +22,10 @@ def test_shell(device: AdbDevice):
     output = device.shell("pwd", rstrip=False)
     assert output in ["/\n", "/\r\n"]
 
+def test_shell_stream(device: AdbDevice):
+    c = device.shell(["echo", "-n", "hello world"], stream=True)
+    output = c.read_until_close()
+    assert output == "hello world"
 
 def test_adb_shell_raise_timeout(device: AdbDevice):
     with pytest.raises(adbutils.AdbTimeout):
@@ -79,12 +83,6 @@ def test_wlan_ip(device: AdbDevice):
     time.sleep(3)
     ip = device.wlan_ip()
     assert ip, 'ip is empty'
-
-
-def test_current_app(device: AdbDevice):
-    info = device.current_app()
-    assert 'package' in info
-    assert 'activity' in info
 
 
 def test_app_start_stop(device: AdbDevice):
@@ -170,3 +168,8 @@ def test_remove(device: AdbDevice):
     assert device.sync.exists(remove_path)
     device.remove(remove_path)
     assert not device.sync.exists(remove_path)
+
+
+# def test_create_connection(device: AdbDevice, device_tmp_path: str):
+#     device.sync.push(b"hello", device_tmp_path)
+#     device.create_connection(Network.LOCAL_FILESYSTEM, device_tmp_path)
