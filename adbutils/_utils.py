@@ -130,7 +130,7 @@ class ReadProgress():
             if duration:
                 speed = humanize(self._chunk_size / duration) + "/s"
             else:
-                copytime = time.time() - self.start_time
+                copytime = max(0.1, time.time() - self.start_time)
                 speed = humanize(self.copied / copytime) + "/s"
 
             self.update_time = time.time()
