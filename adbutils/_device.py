@@ -214,6 +214,14 @@ class BaseDevice:
             raise ValueError("Unsupported network type", network)
         return c.conn
 
+    def root(self):
+        """ just implemented, not tested """
+        # Ref: https://github.com/Swind/pure-python-adb/blob/master/ppadb/command/transport/__init__.py#L179
+        with self._client._connect() as c:
+            c.send_command("root:")
+            c.check_okay()
+            return c.read_string_block()
+
 
 class Property():
     def __init__(self, d: BaseDevice):
@@ -301,7 +309,7 @@ class Sync():
 
     def push(self,
              src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
-             dst: str,
+             dst: typing.Union[pathlib.Path, str],
              mode: int = 0o755,
              check: bool = False) -> int:
         # IFREG: File Regular
@@ -315,6 +323,9 @@ class Sync():
         else:
             if not hasattr(src, "read"):
                 raise TypeError("Invalid src type: %s" % type(src))
+        
+        if isinstance(dst, pathlib.Path):
+            dst = dst.as_posix()
         path = dst + "," + str(stat.S_IFREG | mode)
         total_size = 0
         with self._prepare_sync(path, "SEND") as c:
@@ -323,7 +334,6 @@ class Sync():
                 while True:
                     chunk = r.read(4096)
                     if not chunk:
-                        print("d:", datetime)
                         mtime = int(datetime.datetime.now().timestamp())
                         c.conn.send(b"DONE" + struct.pack("<I", mtime))
                         break
