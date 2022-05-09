@@ -15,6 +15,7 @@ import stat
 import struct
 import subprocess
 import tempfile
+import textwrap
 import time
 import typing
 import warnings
@@ -104,6 +105,14 @@ class BaseDevice:
             'abb_exec,fixed_push_symlink_timestamp,abb,stat_v2,apex,shell_v2,fixed_push_mkdir,cmd'
         """
         return self._get_with_command("features")
+
+    @property
+    def info(self) -> dict:
+        return {
+            "serialno": self.get_serialno(),
+            "devpath": self.get_devpath(),
+            "state": self.get_state(),
+        }
 
     def __repr__(self):
         return "AdbDevice(serial={})".format(self.serial)
@@ -1042,7 +1051,8 @@ class AdbDevice(BaseDevice):
             remote_path: device video path
             no_autostart: do not start screenrecord, when call this method
         """
-        # self.shell2("screenrecord -h")
+        if self.shell2("which screenrecord").returncode != 0:
+            raise AdbError("screenrecord command not found")
         return _ScreenRecord(self, remote_path, autostart=not no_autostart)
 
 
@@ -1065,7 +1075,15 @@ class _ScreenRecord():
         if self._started:
             warnings.warn("screenrecord already started", UserWarning)
             return
-        self._stream: AdbConnection = self._d.shell(["screenrecord", self._remote_path],
+        self._d.sync.push(textwrap.dedent("""#!/system/bin/sh
+        # generate by adbutils
+        screenrecord "$1" &
+        PID=$!
+        read ANY
+        kill -INT $PID
+        wait
+        """).encode('utf-8'), "/sdcard/adbutils-screenrecord.sh")
+        self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/my-screenrecord.sh", self._remote_path],
                                      stream=True)
         self._started = True
 
@@ -1076,7 +1094,7 @@ class _ScreenRecord():
 
         if self._stopped:
             return
-        self._stream.send(b"\003")
+        self._stream.send(b"\n")
         self._stream.read_until_close()
         self._stream.close()
         self._stopped = True
