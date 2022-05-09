@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # coding: utf-8
 import os
-import requests
 import shutil
 import subprocess
 import sys
 import zipfile
+
+import requests
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIBNAME = "adbutils"
