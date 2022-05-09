@@ -737,7 +737,7 @@ class AdbDevice(BaseDevice):
             None or dict(version_name, version_code, signature)
         """
         output = self.shell(['dumpsys', 'package', package_name])
-        m = re.compile(r'versionName=(?P<name>[\d.]+)').search(output)
+        m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
         version_name = m.group('name') if m else ""
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
         version_code = m.group('code') if m else ""
