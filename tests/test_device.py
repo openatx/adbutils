@@ -46,7 +46,7 @@ def test_set_ime(device: AdbDevice):
 
 
 def test_wlan_ip(device: AdbDevice):
-    device.switch_airplane(True)
+    device.switch_airplane(False)
     device.switch_wifi(True)
     time.sleep(3)
     ip = device.wlan_ip()
