@@ -447,6 +447,14 @@ pip3 install pytest
 pytest tests/
 ```
 
+# Environment
+Some environment can affect the adbutils behavior
+
+- ADBUTILS_ADB_PATH: specify adb path, default search from PATH
+- ANDROID_SERIAL: default adb serial
+- ANDROID_ADB_SERVER_HOST: default 127.0.0.1
+- ANDROID_ADB_SERVER_PORT: default 5037
+
 ## Watch adb socket data
 Watch the adb socket data using `socat`
 

@@ -46,6 +46,10 @@ def current_ip():
         s.close()
 
 def adb_path():
+    # 0. check env: ADBUTILS_ADB_PATH
+    if os.getenv("ADBUTILS_ADB_PATH"):
+        return os.getenv("ADBUTILS_ADB_PATH")
+        
     # 1. find in $PATH
     exe = whichcraft.which("adb")
     if exe and _is_valid_exe(exe):
