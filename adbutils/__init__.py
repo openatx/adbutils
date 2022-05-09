@@ -7,14 +7,14 @@ import io
 import os
 import typing
 
-from ._adb import BaseClient
+from ._adb import BaseClient as _BaseClient
 from ._device import AdbDevice, Sync
 from ._utils import adb_path
 from .errors import *
 from ._proto import *
 
 
-class AdbClient(BaseClient):
+class AdbClient(_BaseClient):
     def sync(self, serial: str) -> Sync:
         return Sync(self, serial)
     

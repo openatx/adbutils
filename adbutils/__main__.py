@@ -320,7 +320,7 @@ def main():
         d.open_browser(args.browser)
 
     elif args.current:
-        package_name = d.current_app()['package']
+        package_name = d.app_current().package
         info = d.package_info(package_name)
         print(json.dumps(info, indent=4, default=str))
 

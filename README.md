@@ -173,6 +173,11 @@ serial = d.shell("getprop ro.serial")
 # Set timeout for shell command
 d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
 
+# The advanced shell (returncode archieved by add command suffix: ;echo EXIT:$?)
+ret = d.shell2("echo 1")
+print(ret)
+# expect: ShellReturn(args='echo 1', returncode=0, output='1\n')
+
 # show property, also based on d.shell
 print(d.prop.name) # output example: surabaya
 d.prop.model
@@ -226,6 +231,12 @@ You can use it like this:
 # save screenshot
 pilimg = d.screenshot()
 pilimg.save("screenshot.jpg")
+
+# get current app info
+app_info = d.app_current()
+print(app_info.package)
+print(app_info.activity)
+print(app_info.pid) # might be 0
 
 # install apk
 d.install("apidemo.apk") # use local path

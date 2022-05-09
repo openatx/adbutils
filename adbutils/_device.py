@@ -18,21 +18,21 @@ import time
 import typing
 import warnings
 from contextlib import contextmanager
+from dataclasses import asdict
 from typing import Optional, Union
 
 import apkutils2
 import requests
 from deprecation import deprecated
+from PIL import Image, UnidentifiedImageError
 from retry import retry
 
-from ._adb import BaseClient
+from ._adb import AdbConnection, BaseClient
 from ._proto import *
 from ._utils import (APKReader, ReadProgress, adb_path, get_free_port,
                      humanize, list2cmdline)
 from ._version import __version__
 from .errors import AdbError, AdbInstallError
-from ._adb import AdbConnection
-from PIL import Image, UnidentifiedImageError
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
@@ -120,6 +120,7 @@ class BaseDevice:
             string of output
 
         Raises:
+            AdbTimeout
 
         Examples:
             shell("ls -l")
@@ -131,12 +132,32 @@ class BaseDevice:
             return ret
         return ret.rstrip() if rstrip else ret
 
-    @deprecated(deprecated_in="0.2.4",
-                removed_in="0.3.0",
-                current_version=__version__,
-                details="use shell function instead, eg shell(\"ls -l\")")
-    def shell_output(self, *args) -> str:
-        return self._client.shell(self._serial, args)
+    def shell2(self,
+              cmdargs: Union[str, list, tuple],
+              timeout: Optional[float] = None,
+              rstrip=True) -> ShellReturn:
+        """
+        Run shell command with detail output
+
+        Returns:
+            ShellOutput
+        
+        Raises:
+            AdbTimeout
+        """
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = list2cmdline(cmdargs)
+        assert isinstance(cmdargs, str)
+        MAGIC = "X4EXIT:"
+        newcmd = cmdargs + f"; echo {MAGIC}$?"
+        output = self.shell(newcmd, timeout=timeout, rstrip=rstrip)
+        rindex = output.rfind(MAGIC)
+        if rindex == -1:  # normally will not possible
+            raise AdbError("shell output invalid", output)
+        returncoode = int(output[rindex + len(MAGIC):])
+        return ShellReturn(command=cmdargs,
+                           returncode=returncoode,
+                           output=output[:rindex])
 
     def forward(self, local: str, remote: str):
         return self._client.forward(self._serial, local, remote)
@@ -248,6 +269,10 @@ class Sync():
         finally:
             c.close()
 
+    def exists(self, path: str) -> bool:
+        finfo = self.stat(path)
+        return finfo.mtime is not None
+
     def stat(self, path: str) -> FileInfo:
         with self._prepare_sync(path, "STAT") as c:
             assert "STAT" == c.read_string(4)
@@ -322,7 +347,7 @@ class Sync():
                 if cmd == _FAIL:
                     str_size = struct.unpack("<I", c.read(4))[0]
                     error_message = c.read_string(str_size)
-                    raise AdbError(error_message)
+                    raise AdbError(error_message, path)
                 elif cmd == _DONE:
                     break
                 elif cmd == _DATA:
@@ -333,7 +358,7 @@ class Sync():
                     yield chunk
                 else:
                     raise AdbError("Invalid sync cmd", cmd)
-    
+
     def read_bytes(self, path: str) -> bytes:
         return b''.join(self.iter_content(path))
 
@@ -378,7 +403,7 @@ class AdbDevice(BaseDevice):
         except UnidentifiedImageError:
             w, h = self.window_size()
             return Image.new("RGB", (w, h), (220, 120, 100))
-            
+
     def switch_screen(self, status: bool):
         """
         turn screen on/off
@@ -520,19 +545,19 @@ class AdbDevice(BaseDevice):
         m = re.search(r'inet\s*addr:(.*?)\s', result, re.DOTALL)
         if m:
             return m.group(1)
-        
+
         # Huawei P30, has no ifconfig
         result = self.shell(['ip', 'addr', 'show', 'dev', 'wlan0'])
         m = re.search(r'inet (\d+.*?)/\d+', result)
         if m:
             return m.group(1)
-        
+
         # On VirtualDevice, might use eth0
         result = self.shell(['ifconfig', 'eth0'])
         m = re.search(r'inet\s*addr:(.*?)\s', result, re.DOTALL)
         if m:
             return m.group(1)
-        
+
         raise AdbError("fail to parse wlan ip")
 
 
@@ -823,22 +848,40 @@ class AdbDevice(BaseDevice):
 
         Returns:
             content of xml
+        
+        Raises:
+            AdbError
         """
         output = self.shell(
             'uiautomator dump /data/local/tmp/uidump.xml && echo success')
         if "success" not in output:
-            raise RuntimeError("uiautomator dump failed")
+            raise AdbError("uiautomator dump failed", output)
 
         buf = b''
         for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
             buf += chunk
         return buf.decode("utf-8")
 
-    @retry(AdbError, delay=.5, tries=3, jitter=.1)
-    def current_app(self):
+    @deprecated(deprecated_in="0.15.0",
+                removed_in="0.1.0",
+                current_version=__version__,
+                details="Use app_current instead")
+    def current_app(self) -> dict:
         """
         Returns:
             dict(package, activity, pid?)
+
+        Raises:
+            AdbError
+        """
+        info = self.app_current()
+        return asdict(info)
+
+    @retry(AdbError, delay=.5, tries=3, jitter=.1)
+    def app_current(self) -> RunningAppInfo:
+        """
+        Returns:
+            RunningAppInfo(package, activity, pid?)  pid can be 0
 
         Raises:
             AdbError
@@ -856,8 +899,17 @@ class AdbDevice(BaseDevice):
         )
         m = _focusedRE.search(self.shell(['dumpsys', 'window', 'windows']))
         if m:
-            return dict(package=m.group('package'),
-                        activity=m.group('activity'))
+            return RunningAppInfo(package=m.group('package'),
+                               activity=m.group('activity'))
+
+        # search mResumedActivity
+        # https://stackoverflow.com/questions/13193592/adb-android-getting-the-name-of-the-current-activity
+        package = None
+        output = self.shell(['dumpsys', 'activity', 'activities'])
+        _recordRE = re.compile(r'mResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s]+)\s.*?\}')
+        m = _recordRE.search(output)
+        if m:
+            package = m.group("package")
 
         # try: adb shell dumpsys activity top
         _activityRE = re.compile(
@@ -867,9 +919,12 @@ class AdbDevice(BaseDevice):
         ms = _activityRE.finditer(output)
         ret = None
         for m in ms:
-            ret = dict(package=m.group('package'),
-                       activity=m.group('activity'),
-                       pid=int(m.group('pid')))
+            ret = RunningAppInfo(package=m.group('package'),
+                                 activity=m.group('activity'),
+                                 pid=int(m.group('pid')))
+            if ret.package == package:
+                return ret
+
         if ret:  # get last result
             return ret
         raise AdbError("Couldn't get focused app")
@@ -877,7 +932,7 @@ class AdbDevice(BaseDevice):
     def remove(self, path: str):
         """ rm device file """
         self.shell(["rm", path])
-    
+
 
     def screenrecord(self, remote_path=None, no_autostart=False):
         """
@@ -885,6 +940,7 @@ class AdbDevice(BaseDevice):
             remote_path: device video path
             no_autostart: do not start screenrecord, when call this method
         """
+        # self.shell2("screenrecord -h")
         return _ScreenRecord(self, remote_path, autostart=not no_autostart)
 
 
@@ -923,8 +979,10 @@ class _ScreenRecord():
         self._stream.close()
         self._stopped = True
 
-    def stop_and_pull(self, path: str):
+    def stop_and_pull(self, path: typing.Union[str, pathlib.Path]):
         """ pull remote to local and remove remote file """
+        if isinstance(path, pathlib.Path):
+            path = path.as_posix()
         self.stop()
         self._d.sync.pull(self._remote_path, path)
         self._d.remove(self._remote_path)

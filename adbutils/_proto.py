@@ -3,12 +3,15 @@
 """Created on Fri May 06 2022 11:39:40 by codeskyblue
 """
 
-__all__ = ["Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo", "WindowSize"]
-
+__all__ = [
+    "Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
+    "WindowSize", "RunningAppInfo", "ShellReturn"
+]
 
 import enum
+import datetime
 import typing
-from datetime import datetime
+from dataclasses import dataclass
 
 
 class Network(str, enum.Enum):
@@ -42,7 +45,7 @@ class ReverseItem(typing.NamedTuple):
 class FileInfo(typing.NamedTuple):
     mode: int
     size: int
-    mtime: datetime
+    mtime: datetime.datetime
     path: str
 
 
@@ -50,3 +53,22 @@ class WindowSize(typing.NamedTuple):
     width: int
     height: int
 
+
+@dataclass
+class RunningAppInfo:
+    package: str
+    activity: str
+    pid: int = 0
+
+
+@dataclass
+class ShellReturn:
+    """
+    Attributes:
+        command: The str command passed to run().
+        returncode: The exit code of the process, negative for signals.
+        output: the output
+    """
+    command: str
+    returncode: int
+    output: str
