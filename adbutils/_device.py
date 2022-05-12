@@ -298,6 +298,7 @@ class BaseDevice:
             c.check_okay()
         else:
             raise ValueError("Unsupported network type", network)
+        c._finalizer.detach()
         return c.conn
 
     def root(self):
@@ -1110,8 +1111,8 @@ class _ScreenRecord():
         self._d.sync.pull(self._remote_path, path)
         self._d.remove(self._remote_path)
 
-    def close(self):  # alias of stop
-        return self.stop()
+    # def close(self):  # alias of stop
+    #     return self.stop()
 
-    def close_and_pull(self, path: str):  # alias of stop_and_pull
-        return self.stop_and_pull(path=path)
+    # def close_and_pull(self, path: str):  # alias of stop_and_pull
+    #     return self.stop_and_pull(path=path)
