@@ -16,6 +16,7 @@ import struct
 import subprocess
 import tempfile
 import textwrap
+import threading
 import time
 import typing
 import warnings
@@ -82,7 +83,7 @@ class BaseDevice:
                 raise RuntimeError
             c.check_okay()
         return c
-        
+
     def _get_with_command(self, cmd: str) -> str:
         c = self.open_transport(cmd)
         return c.read_string_block()
@@ -98,7 +99,7 @@ class BaseDevice:
     def get_devpath(self) -> str:
         """ example return: usb:12345678Y """
         return self._get_with_command("get-devpath")
-    
+
     def get_features(self) -> str:
         """
         Return example:
@@ -312,7 +313,7 @@ class BaseDevice:
         c.send_command("root:")
         c.check_okay()
         return c.read_string_block()
-    
+
     def tcpip(self, port: int):
         """ restart adbd listening on TCP on PORT
 
@@ -425,7 +426,7 @@ class Sync():
         else:
             if not hasattr(src, "read"):
                 raise TypeError("Invalid src type: %s" % type(src))
-        
+
         if isinstance(dst, pathlib.Path):
             dst = dst.as_posix()
         path = dst + "," + str(stat.S_IFREG | mode)
@@ -1056,6 +1057,120 @@ class AdbDevice(BaseDevice):
             raise AdbError("screenrecord command not found")
         return _ScreenRecord(self, remote_path, autostart=not no_autostart)
 
+    def _start_recording(self, h264_filename: str):
+        """ start video recording """
+        return self._scrcpy.start_recording(h264_filename)
+    
+    def _stop_recording(self):
+        """ stop video recording """
+        return self._scrcpy.stop_recording()
+    
+    def _is_recording(self) -> bool:
+        return self._scrcpy.running
+
+    @property
+    def _scrcpy(self) -> "ScrcpyClient":
+        return ScrcpyClient.get_instance(self)
+
+
+class ScrcpyClient:
+    """
+    # -y  overwrite output files
+    ffmpeg -i "output.h264" -c:v copy -f mp4 -y "video.mp4"
+
+    遗留问题：秒表视频，转化后的视频时长不对啊（本来5s的，转化后变成了20s）
+
+    https://stackoverflow.com/questions/21263064/how-to-wrap-h264-into-a-mp4-container
+    """
+    __instances = {}
+
+    def __init__(self, d: AdbDevice, h264_filename: str = None):
+        self._d = d
+        self._filename = h264_filename
+        self._conn: AdbConnection = None
+        self._done_event = threading.Event()
+
+    @classmethod
+    def get_instance(cls, d: AdbDevice) -> "ScrcpyClient":
+        if d in cls.__instances:
+            return cls.__instances[d]
+        c = cls.__instances[d] = ScrcpyClient(d)
+        return c
+    
+    @property
+    def running(self) -> bool:
+        return self._conn and not self._conn.closed
+    
+    def start_recording(self, h264_filename: str):
+        if self.running:
+            raise RuntimeError("already running")
+        self._filename = h264_filename
+        self._start()
+
+    def stop_recording(self):
+        if not self.running:
+            raise RuntimeError("already stopped")
+        self._stop()
+
+    def _start(self):
+        curdir = pathlib.Path(__file__).absolute().parent
+        device_jar_path = "/data/local/tmp/scrcpy-server.jar"
+        scrcpy_server_jar_path = curdir.joinpath("binaries/scrcpy-server-1.24.jar")
+
+        self._d.sync.push(scrcpy_server_jar_path, device_jar_path)
+
+        opts = [
+            'control=false', 'bit_rate=8000000', 'tunnel_forward=true',
+            'lock_video_orientation=-1', 'send_dummy_byte=false',
+            "send_device_meta=false", "send_frame_meta=true", "downsize_on_error=true"
+        ]
+        cmd = [
+            'CLASSPATH=' + device_jar_path, 'app_process', '/',
+            '--nice-name=scrcpy-server', 'com.genymobile.scrcpy.Server', '1.24'
+        ] + opts
+        _c = self._d.shell(cmd, stream=True)
+        c: AdbConnection = _c
+        del(_c)
+        message = c.conn.recv(100).decode('utf-8')
+        print("Scrcpy:", message)
+        self._conn = c
+        threading.Thread(name="scrcpy_main", target=self._copy2null, args=(c.conn,), daemon=True).start()
+        time.sleep(0.1)
+        stream_sock = self._safe_dial_scrcpy()
+        fh = pathlib.Path(self._filename).open("wb")
+        threading.Thread(name="socket_copy", target=self._copy2file, args=(stream_sock, fh), daemon=True).start()
+
+    @retry(AdbError, tries=10, delay=0.1, jitter=0.01)
+    def _safe_dial_scrcpy(self) -> socket.socket:
+        return self._d.create_connection(Network.LOCAL_ABSTRACT, "scrcpy")
+
+    def _copy2null(self, s: socket.socket):
+        while True:
+            try:
+                chunk = s.recv(1024)
+                if chunk == b"":
+                    print("O:", chunk.decode('utf-8'))
+                    break
+            except:
+                break
+        print("Scrcpy mainThread stopped")
+
+    def _copy2file(self, s: socket.socket, fh: typing.BinaryIO):
+        while True:
+            chunk = s.recv(1<<16)
+            if not chunk:
+                break
+            fh.write(chunk)
+        fh.close()
+        print("Copy h264 stream finished", flush=True)
+        self._done_event.set()
+    
+    def _stop(self) -> bool:
+        self._conn.close()
+        self._done_event.wait(timeout=3.0)
+        time.sleep(1)
+        self._done_event.clear()
+
 
 class _ScreenRecord():
     def __init__(self, d: AdbDevice, remote_path=None, autostart=False):
@@ -1087,7 +1202,7 @@ class _ScreenRecord():
         wait
         """).encode('utf-8')
         self._d.sync.push(script_content, "/sdcard/adbutils-screenrecord.sh")
-        self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/my-screenrecord.sh", self._remote_path],
+        self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/adbutils-screenrecord.sh", self._remote_path],
                                      stream=True)
         self._started = True
 
@@ -1110,9 +1225,3 @@ class _ScreenRecord():
         self.stop()
         self._d.sync.pull(self._remote_path, path)
         self._d.remove(self._remote_path)
-
-    # def close(self):  # alias of stop
-    #     return self.stop()
-
-    # def close_and_pull(self, path: str):  # alias of stop_and_pull
-    #     return self.stop_and_pull(path=path)
