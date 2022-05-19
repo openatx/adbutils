@@ -9,6 +9,6 @@ import adbutils
 
 
 def test_scrcpyrecord(device: adbutils.AdbDevice):
-    device.start_recording("output.h264")
-    time.sleep(3)
+    device.start_recording("output.mp4")
+    time.sleep(2.0)
     device.stop_recording()

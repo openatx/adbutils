@@ -282,10 +282,19 @@ d.root()
 d.tcpip(5555)
 ```
 
-Screenrecord
+Screenrecord (mp4)
 
+```python
+d.start_recording("video.mp4")
+time.sleep(5)
+d.stop_recording()
 ```
-# run screenrecord to record screen
+
+> Screenrecord will try to use scrcpy first if scrcpy found in $PATH, then fallback to `adb shell screenrecord`
+
+_Note: The old method d.screenrecord() is removed after 0.16.2_
+
+<!-- # run screenrecord to record screen
 r = d.screenrecord()
 # sleep for a while, can not large then 3 minutes
 r.stop() # stop recording
@@ -295,7 +304,7 @@ r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remo
 r = d.screenrecord(no_autostart=True)
 r.start() # start record
 r.stop_and_pull("video.mp4") # stop recording and pull video to local, then remove video from device
-```
+``` -->
 
 For further usage, please read [_device.py](adbutils/_device.py) for details.
 

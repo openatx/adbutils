@@ -4,12 +4,15 @@
 """Created on Fri May 06 2022 10:33:39 by codeskyblue
 """
 
+import abc
 import datetime
 import io
 import json
 import os
 import pathlib
 import re
+import shutil
+import signal
 import socket
 import stat
 import struct
@@ -23,6 +26,7 @@ import warnings
 from contextlib import contextmanager
 from dataclasses import asdict
 from typing import Optional, Union
+import weakref
 
 import apkutils2
 import requests
@@ -52,6 +56,11 @@ class BaseDevice:
 
         if not serial and not transport_id:
             raise AdbError("serial, transport_id must set atleast one")
+        
+        self._prepare()
+
+    def _prepare(self):
+        """ rewrite in sub class """
 
     @property
     def serial(self) -> str:
@@ -496,8 +505,41 @@ class Sync():
             return size
 
 
+class AbstractScreenRecord:
+    @abc.abstractmethod
+    def is_recording(self) -> bool:
+        """ return whether recording """
+    
+    @abc.abstractmethod
+    def check_env(self) -> bool:
+        """ check if environment if valid """
+
+    @abc.abstractmethod
+    def _start(self, filename: str):
+        pass
+
+    @abc.abstractmethod
+    def _stop(self):
+        pass
+
+    def start_recording(self, filename: str):
+        if self.is_recording():
+            print("recording already running")
+            return
+        self._start(filename)
+    
+    def stop_recording(self):
+        if not self.is_recording():
+            print("recording alreay stopped")
+            return
+        self._stop()
+
+
 class AdbDevice(BaseDevice):
     """ provide custom functions for some complex operations """
+
+    def _prepare(self):
+        self._record_client = None
 
     def screenshot(self) -> Image.Image:
         """ not thread safe """
@@ -1046,34 +1088,73 @@ class AdbDevice(BaseDevice):
         """ rm device file """
         self.shell(["rm", path])
 
-
-    def screenrecord(self, remote_path=None, no_autostart=False):
-        """
-        Args:
-            remote_path: device video path
-            no_autostart: do not start screenrecord, when call this method
-        """
-        if self.shell2("which screenrecord").returncode != 0:
-            raise AdbError("screenrecord command not found")
-        return _ScreenRecord(self, remote_path, autostart=not no_autostart)
-
-    def _start_recording(self, h264_filename: str):
+    def __get_screenrecord_impl(self) -> AbstractScreenRecord:
+        if self._record_client:
+            return self._record_client
+        r1 = _ScrcpyScreenRecord(self)
+        if r1.check_env():
+            self._record_client = r1
+            return r1
+        r2 = _AdbScreenRecord(self)
+        if r2.check_env():
+            self._record_client = r2
+            return r2
+        raise AdbError("no valid screenrecord client")
+        
+    def start_recording(self, filename: str):
         """ start video recording """
-        return self._scrcpy.start_recording(h264_filename)
+        self.__get_screenrecord_impl().start_recording(filename)
     
-    def _stop_recording(self):
+    def stop_recording(self):
         """ stop video recording """
-        return self._scrcpy.stop_recording()
+        return self.__get_screenrecord_impl().stop_recording()
     
-    def _is_recording(self) -> bool:
-        return self._scrcpy.running
-
-    @property
-    def _scrcpy(self) -> "ScrcpyClient":
-        return ScrcpyClient.get_instance(self)
+    def is_recording(self) -> bool:
+        """ is recording """
+        return self.__get_screenrecord_impl().is_recording()
 
 
-class ScrcpyClient:
+class _ScrcpyScreenRecord(AbstractScreenRecord):
+    def __init__(self, d: AdbDevice):
+        self._d = d
+        bin_name = "scrcpy" if os.name == "posix" else "scrcpy.exe"
+        self._scrcpy_path = shutil.which(bin_name)
+        self._p: subprocess.Popen = None
+
+    def is_recording(self) -> bool:
+        return bool(self._p and self._p.poll() is None)
+
+    def check_env(self) -> bool:
+        return self._scrcpy_path is not None
+    
+    def _start(self, filename: str):
+        env = os.environ.copy()
+        env['ADB'] = adb_path()
+        env['ANDROID_SERIAL'] = self._d.serial
+        self._p = subprocess.Popen([self._scrcpy_path, '--show-touches', '--no-display', '--record', filename], 
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, env=env)
+        self._finalizer = weakref.finalize(self._p, self._p.kill)
+    
+    def _stop(self):
+        self._finalizer.detach()
+        self._p.send_signal(signal.SIGINT)
+        try:
+            returncode = self._p.wait(timeout=3)
+            if returncode == 0:
+                pass # 正常退出
+            elif returncode == 1:
+                raise AdbError("scrcpy error: start failure")
+            elif returncode == 2:
+                raise AdbError("scrcpy error: device disconnected while running")
+            else:
+                raise AdbError("scrcpy error", returncode)
+        except subprocess.TimeoutExpired:
+            self._p.kill()
+            raise AdbError("scrcpy not handled SIGINT, killed")
+
+
+class _ScrcpyJarScreenrecord:
     """
     # -y  overwrite output files
     ffmpeg -i "output.h264" -c:v copy -f mp4 -y "video.mp4"
@@ -1081,38 +1162,20 @@ class ScrcpyClient:
     遗留问题：秒表视频，转化后的视频时长不对啊（本来5s的，转化后变成了20s）
 
     https://stackoverflow.com/questions/21263064/how-to-wrap-h264-into-a-mp4-container
-    """
-    __instances = {}
 
+    协议没有完全理解，Frame的pts也没有。还是需要多看看scrcpy的代码才行。
+    """
     def __init__(self, d: AdbDevice, h264_filename: str = None):
         self._d = d
         self._filename = h264_filename
         self._conn: AdbConnection = None
         self._done_event = threading.Event()
-
-    @classmethod
-    def get_instance(cls, d: AdbDevice) -> "ScrcpyClient":
-        if d in cls.__instances:
-            return cls.__instances[d]
-        c = cls.__instances[d] = ScrcpyClient(d)
-        return c
     
-    @property
-    def running(self) -> bool:
+    def is_recording(self) -> bool:
         return self._conn and not self._conn.closed
-    
-    def start_recording(self, h264_filename: str):
-        if self.running:
-            raise RuntimeError("already running")
-        self._filename = h264_filename
-        self._start()
 
-    def stop_recording(self):
-        if not self.running:
-            raise RuntimeError("already stopped")
-        self._stop()
-
-    def _start(self):
+    def _start(self, filename: str):
+        self._filename = filename
         curdir = pathlib.Path(__file__).absolute().parent
         device_jar_path = "/data/local/tmp/scrcpy-server.jar"
         scrcpy_server_jar_path = curdir.joinpath("binaries/scrcpy-server-1.24.jar")
@@ -1172,26 +1235,24 @@ class ScrcpyClient:
         self._done_event.clear()
 
 
-class _ScreenRecord():
+class _AdbScreenRecord(AbstractScreenRecord):
     def __init__(self, d: AdbDevice, remote_path=None, autostart=False):
         """ The maxium record time is 3 minutes """
         self._d = d
         if not remote_path:
-            remote_path = "/sdcard/video-%d.mp4" % int(time.time() * 1000)
+            remote_path = "/sdcard/adbutils-tmp-video-%d.mp4" % int(time.time() * 1000)
         self._remote_path = remote_path
         self._stream = None
-        self._stopped = False
-        self._started = False
 
-        if autostart:
-            self.start()
+    def check_env(self) -> bool:
+        ret = self._d.shell2(["which", "screenrecord"])
+        return ret.returncode == 0
+        
+    def is_recording(self) -> bool:
+        return bool(self._stream and not self._stream.closed)
 
-    def start(self):
-        """ start recording """
-        if self._started:
-            warnings.warn("screenrecord already started", UserWarning)
-            return
-        # end first line with \ to avoid the empty line!
+    def _start(self, filename: str):
+        self._filename = filename
         script_content = textwrap.dedent("""\
         #!/system/bin/sh
         # generate by adbutils
@@ -1204,24 +1265,11 @@ class _ScreenRecord():
         self._d.sync.push(script_content, "/sdcard/adbutils-screenrecord.sh")
         self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/adbutils-screenrecord.sh", self._remote_path],
                                      stream=True)
-        self._started = True
-
-    def stop(self):
-        """ stop recording """
-        if not self._started:
-            raise RuntimeError("screenrecord is not started")
-
-        if self._stopped:
-            return
+        
+    def _stop(self):
         self._stream.send(b"\n")
         self._stream.read_until_close()
         self._stream.close()
-        self._stopped = True
 
-    def stop_and_pull(self, path: typing.Union[str, pathlib.Path]):
-        """ pull remote to local and remove remote file """
-        if isinstance(path, pathlib.Path):
-            path = path.as_posix()
-        self.stop()
-        self._d.sync.pull(self._remote_path, path)
+        self._d.sync.pull(self._remote_path, self._filename)
         self._d.remove(self._remote_path)
