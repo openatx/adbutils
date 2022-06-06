@@ -30,7 +30,11 @@ def get_free_port():
 
 
 def list2cmdline(args: typing.Union[list, tuple]):
-    """ do not use subprocess.list2cmdline, use this instead """
+    """ do not use subprocess.list2cmdline, use this instead
+
+    Reason:
+        subprocess.list2cmdline(['echo', '&']) --> "a &", but what I expect should be "a '&'"
+    """
     return ' '.join(map(shlex.quote, args))
 
 
