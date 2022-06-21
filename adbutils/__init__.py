@@ -81,8 +81,8 @@ device = adb.device
 
 if __name__ == "__main__":
     print("server version:", adb.server_version())
-    print("devices:", adb.devices())
-    d = adb.devices()[0]
+    print("devices:", adb.device_list())
+    d = adb.device_list()[0]
 
     print(d.serial)
     for f in adb.sync(d.serial).iter_directory("/data/local/tmp"):
