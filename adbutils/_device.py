@@ -1102,7 +1102,11 @@ class AdbDevice(BaseDevice):
         raise AdbError("no valid screenrecord client")
         
     def start_recording(self, filename: str):
-        """ start video recording """
+        """ start video recording
+
+        Raises:
+            AdbError (when no record client)
+        """
         self.__get_screenrecord_impl().start_recording(filename)
     
     def stop_recording(self):
@@ -1131,7 +1135,7 @@ class _ScrcpyScreenRecord(AbstractScreenRecord):
         env = os.environ.copy()
         env['ADB'] = adb_path()
         env['ANDROID_SERIAL'] = self._d.serial
-        self._p = subprocess.Popen([self._scrcpy_path, '--show-touches', '--no-display', '--record', filename], 
+        self._p = subprocess.Popen([self._scrcpy_path, '--no-control', '--no-display', '--record', filename], 
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL, env=env)
         self._finalizer = weakref.finalize(self._p, self._p.kill)
