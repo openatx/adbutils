@@ -245,12 +245,12 @@ def main():
         
         if args.install_confirm:
             import uiautomator2 as u2
-            ud = u2.connect(args.serial)
+            ud = u2.connect_usb(args.serial)
             _callback = functools.partial(_callback, ud=ud)
         else:
             _callback = None
 
-        d.install(args.install, uninstall=True, callback=_callback)
+        d.install(args.install, nolaunch=not args.launch, uninstall=True, callback=_callback)
 
     elif args.uninstall:
         d.uninstall(args.uninstall)
