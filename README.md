@@ -46,11 +46,11 @@ Example
 import adbutils
 
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
-print(adb.devices())
+print(adb.device_list())
 
 # Set socket timeout to 10 (default None)
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=10)
-print(adb.devices())
+print(adb.device_list())
 ```
 
 The above code can be short to `from adbutils import adb`
@@ -59,7 +59,7 @@ The above code can be short to `from adbutils import adb`
 ```python
 from adbutils import adb
 
-for d in adb.devices():
+for d in adb.device_list():
     print(d.serial) # print device serial
 
 d = adb.device(serial="33ff22xx")
