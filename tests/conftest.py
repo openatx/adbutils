@@ -12,5 +12,6 @@ def device():
 
 @pytest.fixture
 def device_tmp_path(device: AdbDevice):
-    yield "/data/local/tmp/hi.txt"
-    device.remove("/data/local/tmp/hi.txt")
+    tmp_path = "/data/local/tmp/Hi-世界.txt"
+    yield tmp_path
+    device.remove(tmp_path)

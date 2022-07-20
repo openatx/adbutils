@@ -384,7 +384,7 @@ class Sync():
             # {COMMAND}{LittleEndianPathLength}{Path}
             path_len = len(path.encode('utf-8'))
             c.conn.send(
-                cmd.encode("utf-8") + struct.pack("<I", path_len +
+                cmd.encode("utf-8") + struct.pack("<I", path_len) +
                 path.encode("utf-8"))
             yield c
         finally:
@@ -453,7 +453,9 @@ class Sync():
                     c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
                     c.conn.send(chunk)
                     total_size += len(chunk)
-                assert c.read_string(4) == _OKAY
+                status_msg = c.read_string(4)
+                if status_msg != _OKAY:
+                    raise AdbError(status_msg)
             finally:
                 if hasattr(r, "close"):
                     r.close()
