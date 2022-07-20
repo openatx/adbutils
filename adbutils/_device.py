@@ -382,8 +382,9 @@ class Sync():
             c.send_command("sync:")
             c.check_okay()
             # {COMMAND}{LittleEndianPathLength}{Path}
+            path_len = len(path.encode('utf-8'))
             c.conn.send(
-                cmd.encode("utf-8") + struct.pack("<I", len(path)) +
+                cmd.encode("utf-8") + struct.pack("<I", path_len +
                 path.encode("utf-8"))
             yield c
         finally:
