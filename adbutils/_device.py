@@ -144,10 +144,10 @@ class BaseDevice:
         Raises:
             EnvironmentError
         """
-        cmds = [adb_path(), '-s', self._serial
-                ] if self._serial else [adb_path()]
+        cmds = ['-s', self._serial] if self._serial else []
         cmds.extend(args)
-        cmdline = list2cmdline(map(str, cmds))
+        args_line = list2cmdline(map(str, cmds))
+        cmdline = ' '.join([adb_path(), args_line])
         try:
             return subprocess.check_output(cmdline,
                                            stdin=subprocess.DEVNULL,
@@ -282,7 +282,7 @@ class BaseDevice:
             yield ReverseItem(*parts[1:])
 
     def push(self, local: str, remote: str):
-        self.adb_output("push", local, remote)
+        return self.adb_output("push", local, remote)
 
     def create_connection(self, network: Network, address: Union[int, str]) -> socket.socket:
         """
