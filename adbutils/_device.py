@@ -147,16 +147,14 @@ class BaseDevice:
         cmds = [adb_path(), '-s', self._serial
                 ] if self._serial else [adb_path()]
         cmds.extend(args)
-        cmdline = list2cmdline(map(str, cmds))
         try:
-            return subprocess.check_output(cmdline,
+            return subprocess.check_output(cmds,
                                            stdin=subprocess.DEVNULL,
-                                           stderr=subprocess.STDOUT,
-                                           shell=True).decode('utf-8')
+                                           stderr=subprocess.STDOUT).decode('utf-8')
         except subprocess.CalledProcessError as e:
             if kwargs.get('raise_error', True):
                 raise EnvironmentError(
-                    "subprocess", cmdline,
+                    "subprocess", cmds,
                     e.output.decode('utf-8', errors='ignore'))
 
     def shell(self,
@@ -281,8 +279,8 @@ class BaseDevice:
                 continue
             yield ReverseItem(*parts[1:])
 
-    def push(self, local: str, remote: str):
-        self.adb_output("push", local, remote)
+    def push(self, local: str, remote: str) -> str:
+        return self.adb_output("push", local, remote)
 
     def create_connection(self, network: Network, address: Union[int, str]) -> socket.socket:
         """
