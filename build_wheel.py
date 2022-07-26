@@ -25,7 +25,8 @@ BINARIES_URL = {
 }
 
 # https://peps.python.org/pep-0491/#file-format
-linux_plats = "linux_x86_64"
+# https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
+linux_plats = "manylinux1_x86_64"
 darwin_plats = "macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64"
 
 WHEEL_BUILDS = {
