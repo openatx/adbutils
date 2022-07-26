@@ -24,12 +24,13 @@ BINARIES_URL = {
     "win32": "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
 }
 
-linux_plats = "manylinux_2_24_x86_64.manylinux_2_24_aarch64"
+# https://peps.python.org/pep-0491/#file-format
+linux_plats = "linux_x86_64"
 darwin_plats = "macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64"
 
 WHEEL_BUILDS = {
     "py3-none-" + darwin_plats: "darwin",
-    # "py3-none-" + linux_plats: "linux",  # look into manylinux wheel builder
+    "py3-none-" + linux_plats: "linux",  # look into manylinux wheel builder
     "py3-none-win32": "win32",
     "py3-none-win_amd64": "win32",
 }

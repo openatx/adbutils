@@ -1185,7 +1185,10 @@ class _ScrcpyJarScreenrecord:
         self._filename = filename
         curdir = pathlib.Path(__file__).absolute().parent
         device_jar_path = "/data/local/tmp/scrcpy-server.jar"
+
+        # scrcpy deleted
         scrcpy_server_jar_path = curdir.joinpath("binaries/scrcpy-server-1.24.jar")
+        assert scrcpy_server_jar_path.exists()
 
         self._d.sync.push(scrcpy_server_jar_path, device_jar_path)
 
