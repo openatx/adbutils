@@ -321,7 +321,7 @@ class BaseDevice:
         c = self.open_transport()
         c.send_command("root:")
         c.check_okay()
-        return c.read_string_block()
+        return c.read_until_close()
 
     def tcpip(self, port: int):
         """ restart adbd listening on TCP on PORT
