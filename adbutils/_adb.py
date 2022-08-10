@@ -312,6 +312,7 @@ class BaseClient(object):
 
     @deprecated(deprecated_in="0.15.0",
                 removed_in="1.0.0",
+                details="use device.forward_list instead",
                 current_version=__version__)
     def forward_list(self, serial: Union[None, str] = None):
         with self._connect() as c:
@@ -331,6 +332,7 @@ class BaseClient(object):
 
     @deprecated(deprecated_in="0.15.0",
                 removed_in="1.0.0",
+                details="use Device.forward instead",
                 current_version=__version__)
     def forward(self, serial, local, remote, norebind=False):
         """
@@ -352,6 +354,7 @@ class BaseClient(object):
 
     @deprecated(deprecated_in="0.15.0",
                 removed_in="1.0.0",
+                details="use Device.reverse instead",
                 current_version=__version__)
     def reverse(self, serial, remote, local, norebind=False):
         """
@@ -372,6 +375,7 @@ class BaseClient(object):
 
     @deprecated(deprecated_in="0.15.0",
                 removed_in="1.0.0",
+                details="use Device.reverse_list instead",
                 current_version=__version__)
     def reverse_list(self, serial: Union[None, str] = None):
         with self._connect() as c:

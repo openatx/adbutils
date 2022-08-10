@@ -238,7 +238,7 @@ class BaseDevice:
         self.forward("tcp:" + str(local_port), remote)
         return local_port
 
-    def forward_list(self):
+    def forward_list(self) -> typing.Iterator[ForwardItem]:
         c = self.open_transport("list-forward")
         content = c.read_string_block()
         for line in content.splitlines():
@@ -246,7 +246,6 @@ class BaseDevice:
             if len(parts) != 3:
                 continue
             yield ForwardItem(*parts)
-        return self._client.forward_list(self._serial)
 
     def reverse(self, remote: str, local: str, norebind: bool = False):
         """
