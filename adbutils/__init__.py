@@ -33,7 +33,7 @@ class AdbClient(_BaseClient):
               timeout: typing.Optional[float] = None) -> typing.Union[str, AdbConnection]:
         return self.device(serial).shell(command, stream=stream, timeout=timeout)
 
-    def iter_device(self) -> typing.Iterator:
+    def iter_device(self) -> typing.Iterator[AdbDevice]:
         """
         Returns:
             iter of AdbDevice
@@ -49,12 +49,12 @@ class AdbClient(_BaseClient):
                 if parts[1] == 'device':
                     yield AdbDevice(self, serial=parts[0])
 
-    def device_list(self):
+    def device_list(self) -> typing.List[AdbDevice]:
         return list(self.iter_device())
 
     def device(self,
                serial: str = None,
-               transport_id: int = None) -> 'AdbDevice':
+               transport_id: int = None) -> AdbDevice:
         if serial:
             return AdbDevice(self, serial=serial)
         
