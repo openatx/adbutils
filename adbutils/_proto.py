@@ -5,7 +5,7 @@
 
 __all__ = [
     "Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
-    "WindowSize", "RunningAppInfo", "ShellReturn"
+    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo"
 ]
 
 import enum
@@ -72,3 +72,9 @@ class ShellReturn:
     command: str
     returncode: int
     output: str
+
+
+@dataclass
+class AdbDeviceInfo:
+    serial: str
+    state: str

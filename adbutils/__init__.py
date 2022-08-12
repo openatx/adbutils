@@ -33,11 +33,12 @@ class AdbClient(_BaseClient):
               timeout: typing.Optional[float] = None) -> typing.Union[str, AdbConnection]:
         return self.device(serial).shell(command, stream=stream, timeout=timeout)
 
-    def iter_device(self) -> typing.Iterator[AdbDevice]:
+    def list(self) -> typing.List[AdbDeviceInfo]:
         """
         Returns:
-            iter of AdbDevice
+            list of device info, including offline
         """
+        infos = []
         with self._connect() as c:
             c.send_command("host:devices")
             c.check_okay()
@@ -46,8 +47,18 @@ class AdbClient(_BaseClient):
                 parts = line.strip().split("\t")
                 if len(parts) != 2:
                     continue
-                if parts[1] == 'device':
-                    yield AdbDevice(self, serial=parts[0])
+                infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1]))
+        return infos
+
+    def iter_device(self) -> typing.Iterator[AdbDevice]:
+        """
+        Returns:
+            iter only AdbDevice with state:device
+        """
+        for info in self.list():
+            if info.state != "device":
+                continue
+            yield AdbDevice(self, serial=info.serial)
 
     def device_list(self) -> typing.List[AdbDevice]:
         return list(self.iter_device())
