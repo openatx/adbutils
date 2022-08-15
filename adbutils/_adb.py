@@ -101,7 +101,8 @@ class AdbConnection(object):
         return buffer
 
     def send_command(self, cmd: str):
-        self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
+        cmd_bytes = cmd.encode("utf-8")
+        self.conn.send("{:04x}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes)
 
     def read_string(self, n: int) -> str:
         data = self.read(n).decode()
