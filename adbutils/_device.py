@@ -17,7 +17,6 @@ import socket
 import stat
 import struct
 import subprocess
-import tempfile
 import textwrap
 import threading
 import time
