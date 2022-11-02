@@ -764,14 +764,15 @@ class AdbDevice(BaseDevice):
         if main_activity and main_activity.find(".") == -1:
             main_activity = "." + main_activity
 
-        version_name = apk.manifest.version_name
+        version_code = apk.manifest.version_code
         _dprint("packageName:", package_name)
         _dprint("mainActivity:", main_activity)
-        _dprint("apkVersion: {}".format(version_name))
+        _dprint("apkVersion: {}".format(apk.manifest.version_name))
         _dprint("Success pushed, time used %d seconds" % (time.time() - start))
 
         new_dst = "/data/local/tmp/{}-{}.apk".format(package_name,
-                                                     version_name)
+                                                     version_code)
+        _dprint("Rename to {}".format(new_dst))
         self.shell(["mv", dst, new_dst])
 
         dst = new_dst
