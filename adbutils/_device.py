@@ -17,7 +17,6 @@ import socket
 import stat
 import struct
 import subprocess
-import tempfile
 import textwrap
 import threading
 import time
@@ -544,17 +543,16 @@ class AdbDevice(BaseDevice):
     def screenshot(self) -> Image.Image:
         """ not thread safe """
         try:
-            inner_tmp_path = "/sdcard/tmp001.png"
-            self.shell(['rm', inner_tmp_path])
-            self.shell(["screencap", "-p", inner_tmp_path])
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                target_path = os.path.join(tmpdir, "tmp001.png")
-                self.sync.pull(inner_tmp_path, target_path)
-                im = Image.open(target_path)
-                im.load()
-                self._width, self._height = im.size
-                return im.convert("RGB")
+            conn = self.shell(["screencap", "-p"], stream=True)
+            raw_png = b''
+            while True:
+                chunk = conn.read(4096)
+                if not chunk:
+                    break
+                raw_png += chunk
+            im = Image.open(io.BytesIO(raw_png))
+            self._width, self._height = im.size
+            return im.convert("RGB")
         except UnidentifiedImageError:
             w, h = self.window_size()
             return Image.new("RGB", (w, h), (220, 120, 100))
