@@ -119,14 +119,14 @@ class AdbConnection(object):
         size = int(length, 16)
         return self.read_string(size)
 
-    def read_until_close(self) -> str:
+    def read_until_close(self, encoding: str = "utf-8") -> str:
         content = b""
         while True:
             chunk = self.read(4096)
             if not chunk:
                 break
             content += chunk
-        return content.decode('utf-8', errors='ignore')
+        return content.decode(encoding, errors='ignore')
 
     def check_okay(self):
         data = self.read_string(4)

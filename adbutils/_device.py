@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """Created on Fri May 06 2022 10:33:39 by codeskyblue
 """
 
@@ -22,10 +21,10 @@ import threading
 import time
 import typing
 import warnings
+import weakref
 from contextlib import contextmanager
 from dataclasses import asdict
 from typing import Optional, Union
-import weakref
 
 import apkutils2
 import requests
@@ -35,8 +34,9 @@ from retry import retry
 
 from ._adb import AdbConnection, BaseClient
 from ._proto import *
-from ._utils import (APKReader, ReadProgress, adb_path, get_free_port,
-                     humanize, list2cmdline)
+from ._proto import StrOrPathLike
+from ._utils import (APKReader, ReadProgress, StopEvent, adb_path,
+                     get_free_port, humanize, list2cmdline)
 from ._version import __version__
 from .errors import AdbError, AdbInstallError
 
@@ -47,7 +47,11 @@ _DISPLAY_RE = re.compile(
 
 class BaseDevice:
     """ Basic operation for a device """
-    def __init__(self, client: BaseClient, serial: str = None, transport_id: int = None):
+
+    def __init__(self,
+                 client: BaseClient,
+                 serial: str = None,
+                 transport_id: int = None):
         self._client = client
         self._serial = serial
         self._transport_id: int = transport_id
@@ -55,7 +59,7 @@ class BaseDevice:
 
         if not serial and not transport_id:
             raise AdbError("serial, transport_id must set atleast one")
-        
+
         self._prepare()
 
     def _prepare(self):
@@ -65,7 +69,9 @@ class BaseDevice:
     def serial(self) -> str:
         return self._serial
 
-    def open_transport(self, command: str = None, timeout: float = None) -> AdbConnection:
+    def open_transport(self,
+                       command: str = None,
+                       timeout: float = None) -> AdbConnection:
         # connect has it own timeout
         c = self._client._connect()
         if timeout:
@@ -73,7 +79,8 @@ class BaseDevice:
 
         if command:
             if self._transport_id:
-                c.send_command(f"host-transport-id:{self._transport_id}:{command}")
+                c.send_command(
+                    f"host-transport-id:{self._transport_id}:{command}")
             elif self._serial:
                 c.send_command(f"host-serial:{self._serial}:{command}")
             else:
@@ -147,9 +154,9 @@ class BaseDevice:
                 ] if self._serial else [adb_path()]
         cmds.extend(args)
         try:
-            return subprocess.check_output(cmds,
-                                           stdin=subprocess.DEVNULL,
-                                           stderr=subprocess.STDOUT).decode('utf-8')
+            return subprocess.check_output(
+                cmds, stdin=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT).decode('utf-8')
         except subprocess.CalledProcessError as e:
             if kwargs.get('raise_error', True):
                 raise EnvironmentError(
@@ -193,9 +200,9 @@ class BaseDevice:
         return output.rstrip() if rstrip else output
 
     def shell2(self,
-              cmdargs: Union[str, list, tuple],
-              timeout: Optional[float] = None,
-              rstrip=True) -> ShellReturn:
+               cmdargs: Union[str, list, tuple],
+               timeout: Optional[float] = None,
+               rstrip=False) -> ShellReturn:
         """
         Run shell command with detail output
 
@@ -210,20 +217,23 @@ class BaseDevice:
         assert isinstance(cmdargs, str)
         MAGIC = "X4EXIT:"
         newcmd = cmdargs + f"; echo {MAGIC}$?"
-        output = self.shell(newcmd, timeout=timeout, rstrip=rstrip)
+        output = self.shell(newcmd, timeout=timeout, rstrip=True)
         rindex = output.rfind(MAGIC)
         if rindex == -1:  # normally will not possible
             raise AdbError("shell output invalid", output)
         returncoode = int(output[rindex + len(MAGIC):])
+        output = output[:rindex]
+        if rstrip:
+            output = output.rstrip()
         return ShellReturn(command=cmdargs,
                            returncode=returncoode,
-                           output=output[:rindex])
+                           output=output)
 
     def forward(self, local: str, remote: str, norebind: bool = False):
         args = ["forward"]
         if norebind:
             args.append("norebind")
-        args.append(local+";" + remote)
+        args.append(local + ";" + remote)
         self.open_transport(":".join(args))
 
     def forward_port(self, remote: Union[int, str]) -> int:
@@ -231,7 +241,7 @@ class BaseDevice:
         if isinstance(remote, int):
             remote = "tcp:" + str(remote)
         for f in self.forward_list():
-            if f.serial == self._serial and f.remote == remote and f.local.startswith("tcp:"):
+            if f.serial == self._serial and f.remote == remote and f.local.startswith("tcp:"):  # yapf: disable
                 return int(f.local[len("tcp:"):])
         local_port = get_free_port()
         self.forward("tcp:" + str(local_port), remote)
@@ -263,7 +273,7 @@ class BaseDevice:
         args = ["forward"]
         if norebind:
             args.append("norebind")
-        args.append(local+";" + remote)
+        args.append(local + ";" + remote)
         self.open_transport(":".join(args))
 
     def reverse_list(self):
@@ -280,7 +290,8 @@ class BaseDevice:
     def push(self, local: str, remote: str) -> str:
         return self.adb_output("push", local, remote)
 
-    def create_connection(self, network: Network, address: Union[int, str]) -> socket.socket:
+    def create_connection(self, network: Network,
+                          address: Union[int, str]) -> socket.socket:
         """
         Used to connect a socket (unix of tcp) on the device
 
@@ -299,7 +310,10 @@ class BaseDevice:
             assert isinstance(address, str)
             c.send_command("localabstract:" + address)
             c.check_okay()
-        elif network in [Network.LOCAL_FILESYSTEM, Network.LOCAL, Network.DEV, Network.LOCAL_RESERVED]:
+        elif network in [
+            Network.LOCAL_FILESYSTEM, Network.LOCAL, Network.DEV,
+            Network.LOCAL_RESERVED
+        ]:
             c.send_command(network + ":" + address)
             c.check_okay()
         else:
@@ -330,8 +344,64 @@ class BaseDevice:
         c.check_okay()
         return c.read_until_close()
 
+    def logcat(self,
+               file: StrOrPathLike = None,
+               clear: bool = False,
+               re_filter: typing.Union[str, re.Pattern] = None,
+               command: str = "logcat -v time") -> StopEvent:
+        """
+        Args:
+            file (str): file path to save logcat
+            clear (bool): clear logcat before start
+            re_filter (str | re.Pattern): regex pattern to filter logcat
+            command (str): logcat command, default is "logcat -v time"
+
+        Example usage:
+            >>> evt = device.logcat("logcat.txt", clear=True, re_filter=".*python.*")
+            >>> time.sleep(10)
+            >>> evt.stop()
+        """
+        if re_filter:
+            if isinstance(re_filter, str):
+                re_filter = re.compile(re_filter)
+            assert isinstance(re_filter, re.Pattern)
+
+        if clear:
+            self.shell("logcat --clear")
+
+        def _filter_func(line: str) -> bool:
+            if re_filter is None:
+                return True
+            return re_filter.search(line) is not None
+
+        def _copy2file(stream: AdbConnection, fdst: typing.TextIO,
+                       event: StopEvent, filter_func: typing.Callable[[str],
+                                                                      bool]):
+            try:
+                fsrc = stream.conn.makefile("r", encoding="UTF-8")
+                while not event.is_stopped():
+                    line = fsrc.readline()
+                    if not line:
+                        break
+                    if filter_func(line):
+                        fdst.write(line)
+                        fdst.flush()
+            finally:
+                fsrc.close()
+                stream.close()
+                event.done()
+
+        event = StopEvent()
+        stream = self.shell(command, stream=True)
+        fdst = pathlib.Path(file).open("w", encoding="UTF-8")
+        threading.Thread(target=_copy2file,
+                         args=(stream, fdst, event, _filter_func),
+                         daemon=True).start()
+        return event
+
 
 class Property():
+
     def __init__(self, d: BaseDevice):
         self._d = d
 
@@ -341,7 +411,8 @@ class Property():
     def get(self, name: str, cache=True) -> str:
         if cache and name in self._d._properties:
             return self._d._properties[name]
-        value = self._d._properties[name] = self._d.shell(['getprop', name]).strip()
+        value = self._d._properties[name] = self._d.shell(['getprop',
+                                                           name]).strip()
         return value
 
     @property
@@ -365,6 +436,7 @@ _DATA = "DATA"
 
 
 class Sync():
+
     def __init__(self, adbclient: BaseClient, serial: str):
         self._adbclient = adbclient
         self._serial = serial
@@ -416,11 +488,12 @@ class Sync():
     def list(self, path: str) -> typing.List[str]:
         return list(self.iter_directory(path))
 
-    def push(self,
-             src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
-             dst: typing.Union[pathlib.Path, str],
-             mode: int = 0o755,
-             check: bool = False) -> int:
+    def push(
+            self,
+            src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
+            dst: typing.Union[pathlib.Path, str],
+            mode: int = 0o755,
+            check: bool = False) -> int:  # yapf: disable
         # IFREG: File Regular
         # IFDIR: File Directory
         if isinstance(src, pathlib.Path):
@@ -458,7 +531,9 @@ class Sync():
         if check:
             file_size = self.stat(dst).size
             if total_size != file_size:
-                raise AdbError("Push not complete, expect pushed %d, actually pushed %d" % (total_size, file_size))
+                raise AdbError(
+                    "Push not complete, expect pushed %d, actually pushed %d" %
+                    (total_size, file_size))
         return total_size
 
     def iter_content(self, path: str) -> typing.Iterator[bytes]:
@@ -505,10 +580,11 @@ class Sync():
 
 
 class AbstractScreenRecord:
+
     @abc.abstractmethod
     def is_recording(self) -> bool:
         """ return whether recording """
-    
+
     @abc.abstractmethod
     def check_env(self) -> bool:
         """ check if environment if valid """
@@ -526,7 +602,7 @@ class AbstractScreenRecord:
             print("recording already running")
             return
         self._start(filename)
-    
+
     def stop_recording(self):
         if not self.is_recording():
             print("recording alreay stopped")
@@ -713,7 +789,6 @@ class AdbDevice(BaseDevice):
 
         raise AdbError("fail to parse wlan ip")
 
-
     @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
     def install(self,
                 path_or_url: str,
@@ -798,9 +873,9 @@ class AdbDevice(BaseDevice):
 
         except AdbInstallError as e:
             if e.reason in [
-                    "INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
-                    "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
-                    "INSTALL_FAILED_VERSION_DOWNGRADE"
+                "INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
+                "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
+                "INSTALL_FAILED_VERSION_DOWNGRADE"
             ]:
                 _dprint("uninstall %s because %s" % (package_name, e.reason))
                 self.uninstall(package_name)
@@ -1054,13 +1129,14 @@ class AdbDevice(BaseDevice):
         m = _focusedRE.search(self.shell(['dumpsys', 'window', 'windows']))
         if m:
             return RunningAppInfo(package=m.group('package'),
-                               activity=m.group('activity'))
+                                  activity=m.group('activity'))
 
         # search mResumedActivity
         # https://stackoverflow.com/questions/13193592/adb-android-getting-the-name-of-the-current-activity
         package = None
         output = self.shell(['dumpsys', 'activity', 'activities'])
-        _recordRE = re.compile(r'mResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s]+)\s.*?\}')
+        _recordRE = re.compile(
+            r'mResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s]+)\s.*?\}')  # yapf: disable
         m = _recordRE.search(output)
         if m:
             package = m.group("package")
@@ -1099,7 +1175,7 @@ class AdbDevice(BaseDevice):
             self._record_client = r2
             return r2
         raise AdbError("no valid screenrecord client")
-        
+
     def start_recording(self, filename: str):
         """ start video recording
 
@@ -1107,17 +1183,18 @@ class AdbDevice(BaseDevice):
             AdbError (when no record client)
         """
         self.__get_screenrecord_impl().start_recording(filename)
-    
+
     def stop_recording(self):
         """ stop video recording """
         return self.__get_screenrecord_impl().stop_recording()
-    
+
     def is_recording(self) -> bool:
         """ is recording """
         return self.__get_screenrecord_impl().is_recording()
 
 
 class _ScrcpyScreenRecord(AbstractScreenRecord):
+
     def __init__(self, d: AdbDevice):
         self._d = d
         bin_name = "scrcpy" if os.name == "posix" else "scrcpy.exe"
@@ -1129,27 +1206,28 @@ class _ScrcpyScreenRecord(AbstractScreenRecord):
 
     def check_env(self) -> bool:
         return self._scrcpy_path is not None
-    
+
     def _start(self, filename: str):
         env = os.environ.copy()
         env['ADB'] = adb_path()
         env['ANDROID_SERIAL'] = self._d.serial
-        self._p = subprocess.Popen([self._scrcpy_path, '--no-control', '--no-display', '--record', filename], 
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, env=env)
+        self._p = subprocess.Popen([self._scrcpy_path, '--no-control', '--no-display', '--record', filename],
+                                   stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, env=env)  # yapf: disable
         self._finalizer = weakref.finalize(self._p, self._p.kill)
-    
+
     def _stop(self):
         self._finalizer.detach()
         self._p.send_signal(signal.SIGINT)
         try:
             returncode = self._p.wait(timeout=3)
             if returncode == 0:
-                pass # 正常退出
+                pass  # 正常退出
             elif returncode == 1:
                 raise AdbError("scrcpy error: start failure")
             elif returncode == 2:
-                raise AdbError("scrcpy error: device disconnected while running")
+                raise AdbError(
+                    "scrcpy error: device disconnected while running")
             else:
                 raise AdbError("scrcpy error", returncode)
         except subprocess.TimeoutExpired:
@@ -1168,12 +1246,13 @@ class _ScrcpyJarScreenrecord:
 
     协议没有完全理解，Frame的pts也没有。还是需要多看看scrcpy的代码才行。
     """
+
     def __init__(self, d: AdbDevice, h264_filename: str = None):
         self._d = d
         self._filename = h264_filename
         self._conn: AdbConnection = None
         self._done_event = threading.Event()
-    
+
     def is_recording(self) -> bool:
         return self._conn and not self._conn.closed
 
@@ -1183,7 +1262,8 @@ class _ScrcpyJarScreenrecord:
         device_jar_path = "/data/local/tmp/scrcpy-server.jar"
 
         # scrcpy deleted
-        scrcpy_server_jar_path = curdir.joinpath("binaries/scrcpy-server-1.24.jar")
+        scrcpy_server_jar_path = curdir.joinpath(
+            "binaries/scrcpy-server-1.24.jar")
         assert scrcpy_server_jar_path.exists()
 
         self._d.sync.push(scrcpy_server_jar_path, device_jar_path)
@@ -1191,23 +1271,30 @@ class _ScrcpyJarScreenrecord:
         opts = [
             'control=false', 'bit_rate=8000000', 'tunnel_forward=true',
             'lock_video_orientation=-1', 'send_dummy_byte=false',
-            "send_device_meta=false", "send_frame_meta=true", "downsize_on_error=true"
+            "send_device_meta=false", "send_frame_meta=true",
+            "downsize_on_error=true"
         ]
         cmd = [
-            'CLASSPATH=' + device_jar_path, 'app_process', '/',
-            '--nice-name=scrcpy-server', 'com.genymobile.scrcpy.Server', '1.24'
-        ] + opts
+                  'CLASSPATH=' + device_jar_path, 'app_process', '/',
+                  '--nice-name=scrcpy-server', 'com.genymobile.scrcpy.Server', '1.24'
+              ] + opts
         _c = self._d.shell(cmd, stream=True)
         c: AdbConnection = _c
-        del(_c)
+        del (_c)
         message = c.conn.recv(100).decode('utf-8')
         print("Scrcpy:", message)
         self._conn = c
-        threading.Thread(name="scrcpy_main", target=self._copy2null, args=(c.conn,), daemon=True).start()
+        threading.Thread(name="scrcpy_main",
+                         target=self._copy2null,
+                         args=(c.conn,),
+                         daemon=True).start()
         time.sleep(0.1)
         stream_sock = self._safe_dial_scrcpy()
         fh = pathlib.Path(self._filename).open("wb")
-        threading.Thread(name="socket_copy", target=self._copy2file, args=(stream_sock, fh), daemon=True).start()
+        threading.Thread(name="socket_copy",
+                         target=self._copy2file,
+                         args=(stream_sock, fh),
+                         daemon=True).start()
 
     @retry(AdbError, tries=10, delay=0.1, jitter=0.01)
     def _safe_dial_scrcpy(self) -> socket.socket:
@@ -1226,14 +1313,14 @@ class _ScrcpyJarScreenrecord:
 
     def _copy2file(self, s: socket.socket, fh: typing.BinaryIO):
         while True:
-            chunk = s.recv(1<<16)
+            chunk = s.recv(1 << 16)
             if not chunk:
                 break
             fh.write(chunk)
         fh.close()
         print("Copy h264 stream finished", flush=True)
         self._done_event.set()
-    
+
     def _stop(self) -> bool:
         self._conn.close()
         self._done_event.wait(timeout=3.0)
@@ -1242,18 +1329,20 @@ class _ScrcpyJarScreenrecord:
 
 
 class _AdbScreenRecord(AbstractScreenRecord):
+
     def __init__(self, d: AdbDevice, remote_path=None, autostart=False):
         """ The maxium record time is 3 minutes """
         self._d = d
         if not remote_path:
-            remote_path = "/sdcard/adbutils-tmp-video-%d.mp4" % int(time.time() * 1000)
+            remote_path = "/sdcard/adbutils-tmp-video-%d.mp4" % int(
+                time.time() * 1000)
         self._remote_path = remote_path
         self._stream = None
 
     def check_env(self) -> bool:
         ret = self._d.shell2(["which", "screenrecord"])
         return ret.returncode == 0
-        
+
     def is_recording(self) -> bool:
         return bool(self._stream and not self._stream.closed)
 
@@ -1269,9 +1358,10 @@ class _AdbScreenRecord(AbstractScreenRecord):
         wait
         """).encode('utf-8')
         self._d.sync.push(script_content, "/sdcard/adbutils-screenrecord.sh")
-        self._stream: AdbConnection = self._d.shell(["sh", "/sdcard/adbutils-screenrecord.sh", self._remote_path],
-                                     stream=True)
-        
+        self._stream: AdbConnection = self._d.shell(
+            ["sh", "/sdcard/adbutils-screenrecord.sh", self._remote_path],
+            stream=True)
+
     def _stop(self):
         self._stream.send(b"\n")
         self._stream.read_until_close()

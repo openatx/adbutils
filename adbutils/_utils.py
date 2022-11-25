@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import typing
 import zipfile
@@ -179,3 +180,21 @@ class APKReader:
         print("main-activity:", am.main_activity)
         print("version-name:", am.version_name)
         print("version-code:", am.version_code)
+
+
+class StopEvent:
+    def __init__(self):
+        self.__stop = threading.Event()
+        self.__done = threading.Event()
+
+    def stop(self, timeout=None):
+        """ send stop signal and wait signal accepted """
+        self.__stop.set()
+        self.__done.wait(timeout)
+
+    def is_stopped(self) -> bool:
+        return self.__stop.is_set()
+
+    def done(self):
+        """ for worker thread to notify stop signal accepted """
+        self.__done.set()

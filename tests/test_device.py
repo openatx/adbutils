@@ -6,6 +6,7 @@ extra functions test
 
 import io
 import pathlib
+import re
 import time
 
 import pytest
@@ -173,3 +174,12 @@ def test_remove(device: AdbDevice):
 # def test_create_connection(device: AdbDevice, device_tmp_path: str):
 #     device.sync.push(b"hello", device_tmp_path)
 #     device.create_connection(Network.LOCAL_FILESYSTEM, device_tmp_path)
+
+def test_logcat(device: AdbDevice, tmp_path: pathlib.Path):
+    logcat_path = tmp_path / "logcat.txt"
+    logcat = device.logcat(logcat_path, clear=True, command="logcat -v time", re_filter="I/TAG")
+    device.shell(["log", "-p", "i", "-t", "TAG", "hello"])
+    time.sleep(.1)
+    logcat.stop()
+    assert logcat_path.exists()
+    assert re.compile(r"I/TAG.*hello").search(logcat_path.read_text(encoding="utf-8"))

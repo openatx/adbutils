@@ -10,6 +10,7 @@ __all__ = [
 
 import enum
 import datetime
+import pathlib
 import typing
 from dataclasses import dataclass
 
@@ -78,3 +79,6 @@ class ShellReturn:
 class AdbDeviceInfo:
     serial: str
     state: str
+
+
+StrOrPathLike = typing.Union[str, pathlib.Path]
