@@ -137,10 +137,10 @@ def test_screenrecord(device: AdbDevice, tmp_path: pathlib.Path):
     assert target_path.exists()
     
 
-def test_package_info(device: AdbDevice):
+def test_app_info(device: AdbDevice):
     pinfo = device.app_current()
-    pinfo = device.package_info(pinfo.package)
-    assert 'version_name' in pinfo
+    app_info = device.app_info(pinfo.package)
+    assert app_info.package_name is not None
 
 
 def test_window_size(device: AdbDevice):

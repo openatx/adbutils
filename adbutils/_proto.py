@@ -50,6 +50,16 @@ class FileInfo(typing.NamedTuple):
     path: str
 
 
+class AppInfo(typing.NamedTuple):
+    package_name: str
+    version_name: str
+    version_code: int
+    flags: str
+    first_install_time: datetime.datetime
+    last_update_time: datetime.datetime
+    signature: str
+
+
 class WindowSize(typing.NamedTuple):
     width: int
     height: int
