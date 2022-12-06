@@ -43,7 +43,8 @@ def test_shell2(device: AdbDevice):
 def test_get_xxx(device: AdbDevice):
     assert device.get_serialno()
     assert device.get_state() == "device"
-    assert device.get_devpath().startswith("usb:")
+    # adb connect device devpath is "unknown"
+    # assert device.get_devpath().startswith("usb:")
 
 
 def test_keyevent(device: AdbDevice):
@@ -161,6 +162,7 @@ def test_open_browser(device: AdbDevice):
 def test_dump_hierarchy(device: AdbDevice):
     output = device.dump_hierarchy()
     assert output.startswith("<?xml")
+    assert output.rstrip().endswith("</hierarchy>")
 
 
 def test_remove(device: AdbDevice):
