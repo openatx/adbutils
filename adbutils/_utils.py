@@ -186,10 +186,6 @@ class StopEvent:
     def __init__(self):
         self.__stop = threading.Event()
         self.__done = threading.Event()
-
-    def stop_nowait(self):
-        """ send stop signal """
-        self.__stop.set()
     
     def stop(self, timeout=None):
         """ send stop signal and wait signal accepted 
@@ -201,12 +197,20 @@ class StopEvent:
         if not self.__done.wait(timeout):
             raise TimeoutError("wait for stopped timeout", timeout)
 
+    def stop_nowait(self):
+        """ send stop signal """
+        self.__stop.set()
+
     def is_stopped(self) -> bool:
-        return self.__done.is_set()
+        return self.__stop.is_set()
 
     def done(self):
         """ for worker thread to notify stop signal accepted """
         self.__done.set()
+    
+    def is_done(self) -> bool:
+        """ check if background worker has stopped """
+        return self.__done.is_set()
     
     def reset(self):
         self.__stop.clear()

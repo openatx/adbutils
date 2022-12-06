@@ -12,11 +12,13 @@ def test_stop_event():
     assert stop_event.is_stopped() == False
     
     stop_event.stop_nowait()
-    assert stop_event.is_stopped() == False
+    assert stop_event.is_stopped() == True
+    assert stop_event.is_done() == False
 
     with pytest.raises(TimeoutError):
         stop_event.stop(timeout=.1)
-    assert stop_event.is_stopped() == False
+    assert stop_event.is_stopped() == True
+    assert stop_event.is_done() == False
 
     stop_event.done()
-    assert stop_event.is_stopped() == True
+    assert stop_event.is_done() == True

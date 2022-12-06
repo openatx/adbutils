@@ -394,7 +394,8 @@ class BaseDevice:
         event = StopEvent()
         stream = self.shell(command, stream=True)
         fdst = pathlib.Path(file).open("w", encoding="UTF-8")
-        threading.Thread(target=_copy2file,
+        threading.Thread(name="logcat",
+                         target=_copy2file,
                          args=(stream, fdst, event, _filter_func),
                          daemon=True).start()
         return event
@@ -1213,7 +1214,7 @@ class _ScrcpyScreenRecord(AbstractScreenRecord):
         env['ANDROID_SERIAL'] = self._d.serial
         self._p = subprocess.Popen([self._scrcpy_path, '--no-control', '--no-display', '--record', filename],
                                    stdin=subprocess.DEVNULL,
-                                   stdout=subprocess.DEVNULL, env=env)  # yapf: disable
+                                   stdout=subprocess.DEVNULL, env=env)
         self._finalizer = weakref.finalize(self._p, self._p.kill)
 
     def _stop(self):
