@@ -301,7 +301,8 @@ Logcat
 # filter logcat to file
 logcat = d.logcat("logcat.txt", clear=True, re_filter=".*FA.*") # clear default False
 # do something else
-logcat.stop() # tell thread to stop write and close file && wait until done
+logcat.stop() # tell thread to stop write
+logcat.stop_wait() # tell thread to stop write and close file && wait until done
 ```
 
 

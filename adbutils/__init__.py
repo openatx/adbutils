@@ -13,7 +13,7 @@ from ._adb import AdbConnection
 from ._adb import BaseClient as _BaseClient
 from ._device import AdbDevice, Sync
 from ._proto import *
-from ._utils import adb_path
+from ._utils import adb_path, StopEvent
 from ._version import __version__
 from .errors import *
 
