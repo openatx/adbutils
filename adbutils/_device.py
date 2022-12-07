@@ -16,6 +16,7 @@ import socket
 import stat
 import struct
 import subprocess
+import tempfile
 import textwrap
 import threading
 import time
@@ -617,22 +618,29 @@ class AdbDevice(BaseDevice):
     def _prepare(self):
         self._record_client = None
 
-    def screenshot(self) -> Image.Image:
-        """ not thread safe """
-        try:
-            conn = self.shell(["screencap", "-p"], stream=True)
-            raw_png = b''
-            while True:
-                chunk = conn.read(4096)
-                if not chunk:
-                    break
-                raw_png += chunk
-            im = Image.open(io.BytesIO(raw_png))
-            self._width, self._height = im.size
+    def __screencap(self) -> Image.Image:
+        inner_tmp_path = "/sdcard/adbutils-tmp001.png"
+        self.shell(["screencap", "-p", inner_tmp_path])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target_path = os.path.join(tmpdir, "tmp001.png")
+            self.sync.pull(inner_tmp_path, target_path)
+            self.shell(['rm', inner_tmp_path])
+            im = Image.open(target_path)
+            im.load()
             return im.convert("RGB")
-        except UnidentifiedImageError:
-            w, h = self.window_size()
-            return Image.new("RGB", (w, h), (220, 120, 100))
+            
+    def screenshot(self) -> Image.Image:
+        """ not thread safe
+        
+        Note:
+            screencap to file and pull is more stable then shell(stream=True)
+            Ref: https://github.com/openatx/adbutils/pull/78
+        """
+        try:
+            return self.__screencap()
+        except UnidentifiedImageError as e:
+            raise AdbError("screenshot with screencap error", e)
 
     def switch_screen(self, status: bool):
         """
