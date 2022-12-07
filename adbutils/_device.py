@@ -35,7 +35,7 @@ from retry import retry
 
 from ._adb import AdbConnection, BaseClient
 from ._proto import *
-from ._proto import StrOrPathLike
+from ._proto import StrOrPathLike, AppInfo
 from ._utils import (APKReader, ReadProgress, StopEvent, adb_path,
                      get_free_port, humanize, list2cmdline)
 from ._version import __version__
@@ -957,6 +957,10 @@ class AdbDevice(BaseDevice):
             result.append(m.group(1))
         return list(sorted(result))
 
+    @deprecated(deprecated_in="1.1.2",
+                removed_in="2.0.0",
+                current_version=__version__,
+                details="Use app_info instead")
     def package_info(self, package_name: str) -> typing.Union[dict, None]:
         """
         version_code might be empty
@@ -964,37 +968,10 @@ class AdbDevice(BaseDevice):
         Returns:
             None or dict(version_name, version_code, signature)
         """
-        output = self.shell(['dumpsys', 'package', package_name])
-        m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
-        version_name = m.group('name') if m else ""
-        m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
-        version_code = m.group('code') if m else ""
-        if version_code == "0":
-            version_code = ""
-        m = re.search(r'PackageSignatures\{.*?\[(.*)\]\}', output)
-        signature = m.group(1) if m else None
-        if not version_name and signature is None:
-            return None
-        m = re.compile(r"pkgFlags=\[\s*(.*)\s*\]").search(output)
-        pkgflags = m.group(1) if m else ""
-        pkgflags = pkgflags.split()
-
-        time_regex = r"[-\d]+\s+[:\d]+"
-        m = re.compile(f"firstInstallTime=({time_regex})").search(output)
-        first_install_time = datetime.datetime.strptime(
-            m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
-
-        m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
-        last_update_time = datetime.datetime.strptime(
-            m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
-
-        return dict(package_name=package_name,
-                    version_name=version_name,
-                    version_code=version_code,
-                    flags=pkgflags,
-                    first_install_time=first_install_time,
-                    last_update_time=last_update_time,
-                    signature=signature)
+        app_info = self.app_info(package_name)
+        if app_info is None:
+            return app_info
+        return app_info._asdict()
 
     def rotation(self) -> int:
         """
@@ -1070,6 +1047,44 @@ class AdbDevice(BaseDevice):
     def app_clear(self, package_name: str):
         self.shell(["pm", "clear", package_name])
 
+    def app_info(self, package_name: str) -> typing.Optional[AppInfo]:
+        """
+        Get app info
+
+        Returns:
+            None or AppInfo
+        """
+        output = self.shell(['dumpsys', 'package', package_name])
+        m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
+        version_name = m.group('name') if m else ""
+        m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
+        version_code = m.group('code') if m else ""
+        version_code = int(version_code) if version_code.isdigit() else None
+        m = re.search(r'PackageSignatures\{.*?\[(.*)\]\}', output)
+        signature = m.group(1) if m else None
+        if not version_name and signature is None:
+            return None
+        m = re.compile(r"pkgFlags=\[\s*(.*)\s*\]").search(output)
+        pkgflags = m.group(1) if m else ""
+        pkgflags = pkgflags.split()
+
+        time_regex = r"[-\d]+\s+[:\d]+"
+        m = re.compile(f"firstInstallTime=({time_regex})").search(output)
+        first_install_time = datetime.datetime.strptime(
+            m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
+
+        m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
+        last_update_time = datetime.datetime.strptime(
+            m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
+
+        return AppInfo(package_name=package_name,
+                    version_name=version_name,
+                    version_code=version_code,
+                    flags=pkgflags,
+                    first_install_time=first_install_time,
+                    last_update_time=last_update_time,
+                    signature=signature)
+
     def is_screen_on(self):
         output = self.shell(["dumpsys", "power"])
         return 'mHoldingDisplaySuspendBlocker=true' in output
@@ -1099,21 +1114,6 @@ class AdbDevice(BaseDevice):
         for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
             buf += chunk
         return buf.decode("utf-8")
-
-    @deprecated(deprecated_in="0.15.0",
-                removed_in="1.0.0",
-                current_version=__version__,
-                details="Use app_current instead")
-    def current_app(self) -> dict:
-        """
-        Returns:
-            dict(package, activity, pid?)
-
-        Raises:
-            AdbError
-        """
-        info = self.app_current()
-        return asdict(info)
 
     @retry(AdbError, delay=.5, tries=3, jitter=.1)
     def app_current(self) -> RunningAppInfo:

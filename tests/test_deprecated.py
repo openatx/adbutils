@@ -7,10 +7,16 @@
 from adbutils import AdbDevice, adb
 
 
-def test_current_app(device: AdbDevice):
-    info = device.current_app()
-    assert 'package' in info
-    assert 'activity' in info
+def test_package_info(device: AdbDevice):
+    pinfo = device.app_current()
+    pinfo = device.package_info(pinfo.package)
+    assert 'version_name' in pinfo
+
+
+# def test_current_app(device: AdbDevice):
+#     info = device.current_app()
+#     assert 'package' in info
+#     assert 'activity' in info
 
 
 def test_client_shell():
