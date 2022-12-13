@@ -804,7 +804,8 @@ class AdbDevice(BaseDevice):
                 nolaunch: bool = False,
                 uninstall: bool = False,
                 silent: bool = False,
-                callback: typing.Callable[[str], None] = None):
+                callback: typing.Callable[[str], None] = None,
+                flags: list = ["-r", "-t"]):
         """
         Install APK to device
 
@@ -873,7 +874,7 @@ class AdbDevice(BaseDevice):
             if callback:
                 callback("BEFORE_INSTALL")
 
-            self.install_remote(dst, clean=True)
+            self.install_remote(dst, clean=True, flags=flags)
             _dprint("Success installed, time used %d seconds" %
                     (time.time() - start))
             if not nolaunch:
@@ -888,7 +889,7 @@ class AdbDevice(BaseDevice):
             ]:
                 _dprint("uninstall %s because %s" % (package_name, e.reason))
                 self.uninstall(package_name)
-                self.install_remote(dst, clean=True)
+                self.install_remote(dst, clean=True, flags=flags)
                 _dprint("Success installed, time used %d seconds" %
                         (time.time() - start))
                 if not nolaunch:
@@ -900,7 +901,7 @@ class AdbDevice(BaseDevice):
                     # ])
             elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
                 _dprint("Catch error %s, reinstall" % e.reason)
-                self.install_remote(dst, clean=True)
+                self.install_remote(dst, clean=True, flags=flags)
                 _dprint("Success installed, time used %d seconds" %
                         (time.time() - start))
             else:
