@@ -815,7 +815,8 @@ class AdbDevice(BaseDevice):
             uninstall: uninstall app before install
             silent: disable log message print
             callback: only two event now: <"BEFORE_INSTALL" | "FINALLY">
-        
+            flags (list): default ["-r", "-t"]
+
         Raises:
             AdbInstallError, BrokenPipeError
         """
