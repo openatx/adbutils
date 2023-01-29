@@ -1,5 +1,6 @@
 import hashlib
 import os
+import random
 import shlex
 import socket
 import subprocess
@@ -21,13 +22,27 @@ def humanize(n: int) -> str:
     return '%.1f MB' % (float(n) / MB)
 
 
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+
 def get_free_port():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('127.0.0.1', 0))
     try:
-        return s.getsockname()[1]
-    finally:
-        s.close()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.1', 0))
+        try:
+            return s.getsockname()[1]
+        finally:
+            s.close()
+    except OSError:
+        # bind 0 will fail on Manjaro, fallback to random port
+        # https://github.com/openatx/adbutils/issues/85
+        for _ in range(20):
+            port = random.randint(10000, 20000)
+            if not is_port_in_use(port):
+                return port
+        raise RuntimeError("No free port found")
 
 
 def list2cmdline(args: typing.Union[list, tuple]):

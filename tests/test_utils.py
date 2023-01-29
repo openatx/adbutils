@@ -6,6 +6,8 @@
 
 import pytest
 from adbutils import StopEvent
+from adbutils._utils import get_free_port
+
 
 def test_stop_event():
     stop_event = StopEvent()
@@ -22,3 +24,8 @@ def test_stop_event():
 
     stop_event.done()
     assert stop_event.is_done() == True
+
+
+def test_get_free_port():
+    port = get_free_port()
+    assert port > 0
