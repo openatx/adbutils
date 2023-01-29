@@ -305,16 +305,18 @@ def main():
         if finfo.mode == 0 and finfo.size == 0:
             sys.exit(f"remote file '{remote_path}' does not exist")
 
-        bytes_so_far = 0
-        for chunk in d.sync.iter_content(remote_path):
-            bytes_so_far += len(chunk)
-            percent = bytes_so_far / finfo.size * 100 if finfo.size != 0 else 100.0
-            print(
-                f"\rDownload to {target_path} ... [{bytes_so_far} / {finfo.size}] %.1f %%"
-                % percent,
-                end="",
-                flush=True)
-        print(f"{remote_path} pulled to {target_path}")
+        with open(target_path, "wb") as fd:
+            bytes_so_far = 0
+            for chunk in d.sync.iter_content(remote_path):
+                fd.write(chunk)
+                bytes_so_far += len(chunk)
+                percent = bytes_so_far / finfo.size * 100 if finfo.size != 0 else 100.0
+                print(
+                    f"\rDownload to {target_path} ... [{bytes_so_far} / {finfo.size}] %.1f %%"
+                    % percent,
+                    end="",
+                    flush=True)
+            print(f"{remote_path} pulled to {target_path}")
 
     elif args.browser:
         d.open_browser(args.browser)
