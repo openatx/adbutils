@@ -66,8 +66,7 @@ class AppInfo:
     path: str
 
 
-@dataclass
-class WindowSize:
+class WindowSize(typing.NamedTuple):
     width: int
     height: int
 
