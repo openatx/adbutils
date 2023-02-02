@@ -1064,6 +1064,8 @@ class AdbDevice(BaseDevice):
         output = self.shell(['dumpsys', 'package', package_name])
         m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
         version_name = m.group('name') if m else ""
+        if version_name == "null": # Java dumps "null" for null values
+            version_name = None
         m = re.compile(r'versionCode=(?P<code>\d+)').search(output)
         version_code = m.group('code') if m else ""
         version_code = int(version_code) if version_code.isdigit() else None
