@@ -4,6 +4,7 @@
 """
 
 import abc
+import dataclasses
 import datetime
 import io
 import json
@@ -973,7 +974,7 @@ class AdbDevice(BaseDevice):
         app_info = self.app_info(package_name)
         if app_info is None:
             return app_info
-        return app_info._asdict()
+        return dataclasses.asdict(app_info)
 
     def rotation(self) -> int:
         """
@@ -1056,6 +1057,10 @@ class AdbDevice(BaseDevice):
         Returns:
             None or AppInfo
         """
+        output = self.shell(['pm', 'path', package_name])
+        if "package:" not in output:
+            return None
+        apk_path = output.split(":", 1)[-1].strip()
         output = self.shell(['dumpsys', 'package', package_name])
         m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
         version_name = m.group('name') if m else ""
@@ -1079,13 +1084,15 @@ class AdbDevice(BaseDevice):
         last_update_time = datetime.datetime.strptime(
             m.group(1).strip(), "%Y-%m-%d %H:%M:%S") if m else None
 
-        return AppInfo(package_name=package_name,
+        app_info = AppInfo(package_name=package_name,
                     version_name=version_name,
                     version_code=version_code,
                     flags=pkgflags,
                     first_install_time=first_install_time,
                     last_update_time=last_update_time,
-                    signature=signature)
+                    signature=signature,
+                    path=apk_path)
+        return app_info
 
     def is_screen_on(self):
         output = self.shell(["dumpsys", "power"])

@@ -26,31 +26,36 @@ class Network(str, enum.Enum):
     LOCAL_ABSTRACT = "localabstract"  # same as UNIX
 
 
-class DeviceEvent(typing.NamedTuple):
+@dataclass
+class DeviceEvent:
     present: bool
     serial: str
     status: str
 
 
-class ForwardItem(typing.NamedTuple):
+@dataclass
+class ForwardItem:
     serial: str
     local: str
     remote: str
 
 
-class ReverseItem(typing.NamedTuple):
+@dataclass
+class ReverseItem:
     remote: str
     local: str
 
 
-class FileInfo(typing.NamedTuple):
+@dataclass
+class FileInfo:
     mode: int
     size: int
     mtime: datetime.datetime
     path: str
 
 
-class AppInfo(typing.NamedTuple):
+@dataclass
+class AppInfo:
     package_name: str
     version_name: str
     version_code: int
@@ -58,9 +63,11 @@ class AppInfo(typing.NamedTuple):
     first_install_time: datetime.datetime
     last_update_time: datetime.datetime
     signature: str
+    path: str
 
 
-class WindowSize(typing.NamedTuple):
+@dataclass
+class WindowSize:
     width: int
     height: int
 
