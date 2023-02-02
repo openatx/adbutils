@@ -58,7 +58,7 @@ class FileInfo:
 class AppInfo:
     package_name: str
     version_name: str
-    version_code: int
+    version_code: typing.Optional[int]
     flags: str
     first_install_time: datetime.datetime
     last_update_time: datetime.datetime
