@@ -1062,7 +1062,7 @@ class AdbDevice(BaseDevice):
             return None
         apk_path = output.split(":", 1)[-1].strip()
         output = self.shell(['dumpsys', 'package', package_name])
-        m = re.compile(r'versionName=(?P<name>[\w.]+)').search(output)
+        m = re.compile(r'versionName=(?P<name>[^\s]+)').search(output)
         version_name = m.group('name') if m else ""
         if version_name == "null": # Java dumps "null" for null values
             version_name = None
