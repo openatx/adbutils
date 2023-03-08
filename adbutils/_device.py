@@ -641,7 +641,8 @@ class AdbDevice(BaseDevice):
         try:
             return self.__screencap()
         except UnidentifiedImageError as e:
-            raise AdbError("screenshot with screencap error", e)
+            wsize = self.window_size()
+            return Image.new("RGB", wsize) # return a blank image when screenshot is not allowed
 
     def switch_screen(self, status: bool):
         """
