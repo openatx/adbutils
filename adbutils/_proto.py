@@ -26,7 +26,7 @@ class Network(str, enum.Enum):
     LOCAL_ABSTRACT = "localabstract"  # same as UNIX
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeviceEvent:
     present: bool
     serial: str
