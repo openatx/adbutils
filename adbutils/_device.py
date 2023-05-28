@@ -1061,7 +1061,11 @@ class AdbDevice(BaseDevice):
         output = self.shell(['pm', 'path', package_name])
         if "package:" not in output:
             return None
-        apk_path = output.split(":", 1)[-1].strip()
+
+        apk_paths = output.splitlines()
+        apk_path = apk_paths[0].split(":", 1)[-1].strip()
+        sub_apk_paths = list(map(lambda p: p.replace("package:", "", 1), apk_paths[1:]))
+
         output = self.shell(['dumpsys', 'package', package_name])
         m = re.compile(r'versionName=(?P<name>[^\s]+)').search(output)
         version_name = m.group('name') if m else ""
@@ -1094,7 +1098,8 @@ class AdbDevice(BaseDevice):
                     first_install_time=first_install_time,
                     last_update_time=last_update_time,
                     signature=signature,
-                    path=apk_path)
+                    path=apk_path,
+                    sub_apk_paths=sub_apk_paths)
         return app_info
 
     def is_screen_on(self):
