@@ -348,13 +348,13 @@ class BaseDevice:
     def logcat(self,
                file: StrOrPathLike = None,
                clear: bool = False,
-               re_filter: typing.Union[str, re.Pattern] = None,
+               re_filter: str = None,
                command: str = "logcat -v time") -> StopEvent:
         """
         Args:
             file (str): file path to save logcat
             clear (bool): clear logcat before start
-            re_filter (str | re.Pattern): regex pattern to filter logcat
+            re_filter (str): regex pattern to filter logcat
             command (str): logcat command, default is "logcat -v time"
 
         Example usage:
@@ -365,7 +365,6 @@ class BaseDevice:
         if re_filter:
             if isinstance(re_filter, str):
                 re_filter = re.compile(re_filter)
-            assert isinstance(re_filter, re.Pattern)
 
         if clear:
             self.shell("logcat --clear")
