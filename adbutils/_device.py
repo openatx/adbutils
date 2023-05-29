@@ -31,7 +31,13 @@ from typing import Optional, Union
 import apkutils2
 import requests
 from deprecation import deprecated
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
+try:
+    from PIL import UnidentifiedImageError
+except ImportError:
+    # fix for py37
+    UnidentifiedImageError = OSError
+
 from retry import retry
 
 from ._adb import AdbConnection, BaseClient
