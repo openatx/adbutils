@@ -64,6 +64,7 @@ class AppInfo:
     last_update_time: datetime.datetime
     signature: str
     path: str
+    sub_apk_paths: typing.List[str]
 
 
 class WindowSize(typing.NamedTuple):
