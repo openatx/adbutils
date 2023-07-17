@@ -52,6 +52,7 @@ _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
 )
 
+_DEFAULT_SOCKET_TIMEOUT = 600  # 10 minutes
 
 class BaseDevice:
     """ Basic operation for a device """
@@ -79,7 +80,7 @@ class BaseDevice:
 
     def open_transport(self,
                        command: str = None,
-                       timeout: float = None) -> AdbConnection:
+                       timeout: float = _DEFAULT_SOCKET_TIMEOUT) -> AdbConnection:
         # connect has it own timeout
         c = self._client._connect()
         if timeout:
@@ -174,7 +175,7 @@ class BaseDevice:
     def shell(self,
               cmdargs: Union[str, list, tuple],
               stream: bool = False,
-              timeout: Optional[float] = None,
+              timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
               rstrip=True) -> typing.Union[AdbConnection, str]:
         """Run shell inside device and get it's content
 
@@ -209,7 +210,7 @@ class BaseDevice:
 
     def shell2(self,
                cmdargs: Union[str, list, tuple],
-               timeout: Optional[float] = None,
+               timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
                rstrip=False) -> ShellReturn:
         """
         Run shell command with detail output
