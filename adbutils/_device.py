@@ -387,7 +387,7 @@ class BaseDevice:
                        event: StopEvent, filter_func: typing.Callable[[str],
                                                                       bool]):
             try:
-                fsrc = stream.conn.makefile("r", encoding="UTF-8")
+                fsrc = stream.conn.makefile("r", encoding="UTF-8", errors='replace')
                 while not event.is_stopped():
                     line = fsrc.readline()
                     if not line:
