@@ -160,7 +160,7 @@ class BaseClient(object):
     def port(self) -> int:
         return self.__port
         
-    def _connect(self, timeout: float = None) -> AdbConnection:
+    def make_connection(self, timeout: float = None) -> AdbConnection:
         """ connect to adb server
         
         Raises:
@@ -180,7 +180,7 @@ class BaseClient(object):
         Returns:
             int
         """
-        with self._connect() as c:
+        with self.make_connection() as c:
             c.send_command("host:version")
             c.check_okay()
             return int(c.read_string_block(), 16)
@@ -192,7 +192,7 @@ class BaseClient(object):
         Send host:kill if adb-server is alive
         """
         if _check_server(self.__host, self.__port):
-            with self._connect() as c:
+            with self.make_connection() as c:
                 c.send_command("host:kill")
                 c.check_okay()
 
@@ -207,7 +207,7 @@ class BaseClient(object):
         Raises:
             AdbError, AdbTimeout
         """
-        with self._connect(timeout=timeout) as c:
+        with self.make_connection(timeout=timeout) as c:
             cmds = []
             if serial:
                 cmds.extend(['host-serial', serial])
@@ -244,7 +244,7 @@ class BaseClient(object):
             - "unable to connect to 192.168.190.101:5551"
             - "failed to connect to '1.2.3.4:4567': Operation timed out"
         """
-        with self._connect(timeout=timeout) as c:
+        with self.make_connection(timeout=timeout) as c:
             c.send_command("host:connect:" + addr)
             c.check_okay()
             return c.read_string_block()
@@ -262,7 +262,7 @@ class BaseClient(object):
             - "disconnected 192.168.190.101:5555"
         """
         try:
-            with self._connect() as c:
+            with self.make_connection() as c:
                 c.send_command("host:disconnect:" + addr)
                 c.check_okay()
                 return c.read_string_block()
@@ -285,7 +285,7 @@ class BaseClient(object):
         """
         orig_devices = []
 
-        with self._connect() as c:
+        with self.make_connection() as c:
             c.send_command("host:track-devices")
             c.check_okay()
             while True:
@@ -316,7 +316,7 @@ class BaseClient(object):
                 details="use device.forward_list instead",
                 current_version=__version__)
     def forward_list(self, serial: Union[None, str] = None):
-        with self._connect() as c:
+        with self.make_connection() as c:
             list_cmd = "host:list-forward"
             if serial:
                 list_cmd = "host-serial:{}:list-forward".format(serial)
@@ -345,7 +345,7 @@ class BaseClient(object):
         Raises:
             AdbError
         """
-        with self._connect() as c:
+        with self.make_connection() as c:
             cmds = ["host-serial", serial, "forward"]
             if norebind:
                 cmds.append("norebind")
@@ -367,7 +367,7 @@ class BaseClient(object):
         Raises:
             AdbError
         """
-        with self._connect() as c:
+        with self.make_connection() as c:
             c.send_command("host:transport:" + serial)
             c.check_okay()
             cmds = ['reverse:forward', remote + ";" + local]
@@ -379,7 +379,7 @@ class BaseClient(object):
                 details="use Device.reverse_list instead",
                 current_version=__version__)
     def reverse_list(self, serial: Union[None, str] = None):
-        with self._connect() as c:
+        with self.make_connection() as c:
             c.send_command("host:transport:" + serial)
             c.check_okay()
             c.send_command("reverse:list-forward")

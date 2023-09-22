@@ -82,7 +82,7 @@ class BaseDevice:
                        command: str = None,
                        timeout: float = _DEFAULT_SOCKET_TIMEOUT) -> AdbConnection:
         # connect has it own timeout
-        c = self._client._connect()
+        c = self._client.make_connection()
         if timeout:
             c.conn.settimeout(timeout)
 
@@ -453,7 +453,7 @@ class Sync():
 
     @contextmanager
     def _prepare_sync(self, path: str, cmd: str):
-        c = self._adbclient._connect()
+        c = self._adbclient.make_connection()
         try:
             c.send_command(":".join(["host", "transport", self._serial]))
             c.check_okay()
@@ -704,6 +704,9 @@ class AdbDevice(BaseDevice):
         """ adb _run input keyevent KEY_CODE """
         return self.shell(['input', 'keyevent', str(key_code)])
 
+    def __is_percent(self, v):
+        return isinstance(v, float) and v <= 1.0
+    
     def click(self, x, y):
         """
         simulate android tap
@@ -711,6 +714,11 @@ class AdbDevice(BaseDevice):
         Args:
             x, y: int
         """
+        is_percent = self.__is_percent
+        if any(map(is_percent, [x, y])):
+            w, h = self.window_size()
+            x = int(x * w) if is_percent(x) else x
+            y = int(y * h) if is_percent(y) else y
         x, y = map(str, [x, y])
         return self.shell(['input', 'tap', x, y])
 
@@ -722,6 +730,13 @@ class AdbDevice(BaseDevice):
             sx, sy: start point(x, y)
             ex, ey: end point(x, y)
         """
+        is_percent = self.__is_percent
+        if any(map(is_percent, [sx, sy, ex, ey])):
+            w, h = self.window_size()
+            sx = int(sx * w) if is_percent(sx) else sx
+            sy = int(sy * h) if is_percent(sy) else sy
+            ex = int(ex * w) if is_percent(ex) else ex
+            ey = int(ey * h) if is_percent(ey) else ey
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         return self.shell(
             ['input', 'swipe', x1, y1, x2, y2,

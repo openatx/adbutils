@@ -39,7 +39,7 @@ class AdbClient(_BaseClient):
             list of device info, including offline
         """
         infos = []
-        with self._connect() as c:
+        with self.make_connection() as c:
             c.send_command("host:devices")
             c.check_okay()
             output = c.read_string_block()

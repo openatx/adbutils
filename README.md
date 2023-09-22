@@ -252,6 +252,7 @@ d.install("http://example.com/apidemo.apk") # install from url
 
 # simulate click
 d.click(100, 100)
+d.click(0.5, 0.5) # center, should be float and <= 1.0
 
 # swipe from(10, 10) to(200, 200) 500ms
 d.swipe(10, 10, 200, 200, 0.5)
@@ -259,7 +260,7 @@ d.swipe(10, 10, 200, 200, 0.5)
 d.list_packages()
 # example output: ["com.example.hello"]
 
-d.window_size() 
+d.window_size()
 # example output: (1080, 1920)
 
 d.rotation()
