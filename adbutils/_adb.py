@@ -99,8 +99,11 @@ class AdbConnection(object):
         self.conn.send("{:04x}{}".format(len(cmd), cmd).encode("utf-8"))
 
     def read_string(self, n: int) -> str:
-        data = self.read(n).decode()
-        return data
+        try:
+            return self.read(n).decode()
+        except UnicodeDecodeError:
+            # ADB server有时抽风, 在解码过程中遇到无法解码的字节
+            return self.read(n).decode('utf-8', 'replace')
 
     def read_string_block(self) -> str:
         """
