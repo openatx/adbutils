@@ -105,7 +105,7 @@ class AdbConnection(object):
         self.conn.send("{:04x}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes)
 
     def read_string(self, n: int) -> str:
-        data = self.read(n).decode()
+        data = self.read(n).decode("utf-8", errors="replace")
         return data
 
     def read_string_block(self) -> str:
@@ -126,7 +126,7 @@ class AdbConnection(object):
             if not chunk:
                 break
             content += chunk
-        return content.decode(encoding, errors='ignore')
+        return content.decode(encoding, errors='replace')
 
     def check_okay(self):
         data = self.read_string(4)
