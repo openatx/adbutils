@@ -628,7 +628,7 @@ class AdbDevice(BaseDevice):
 
     def __screencap(self) -> Image.Image:
         thread_id = threading.get_native_id()
-        inner_tmp_path = f"/sdcard/adbutils-tmp{thread_id}.png"
+        inner_tmp_path = f"/data/local/tmp/adbutils-tmp{thread_id}.png"
         self.shell(["screencap", "-p", inner_tmp_path])
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
