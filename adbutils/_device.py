@@ -615,6 +615,11 @@ class Sync():
             s = 0
             items = list(self.iter_directory(src))
 
+            items = list(filter(
+                lambda i: i.path != '.' and i.path != '..',
+                items
+            ))
+
             dirs = list(
                 filter(
                     lambda f: stat.S_IFDIR & f.mode != 0,
@@ -1271,6 +1276,10 @@ class AdbDevice(BaseDevice):
     def remove(self, path: str):
         """ rm device file """
         self.shell(["rm", path])
+
+    def remove_dir(self, path: str):
+        """ rm -r directory"""
+        self.shell(["rm", "-r", path])
 
     def __get_screenrecord_impl(self) -> AbstractScreenRecord:
         if self._record_client:
