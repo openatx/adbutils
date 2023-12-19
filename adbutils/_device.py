@@ -697,7 +697,7 @@ class AdbDevice(BaseDevice):
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 target_path = os.path.join(tmpdir, "adbutils-tmp.png")
-                self.sync.pull_file(inner_tmp_path, target_path)
+                self.sync.pull(inner_tmp_path, target_path)
                 im = Image.open(target_path)
                 im.load()
                 return im.convert("RGB")
