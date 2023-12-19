@@ -44,7 +44,7 @@ from ._adb import AdbConnection, BaseClient
 from ._proto import *
 from ._proto import StrOrPathLike, AppInfo
 from ._utils import (APKReader, ReadProgress, StopEvent, adb_path,
-                     get_free_port, humanize, list2cmdline)
+                     get_free_port, humanize, list2cmdline, append_path)
 from ._version import __version__
 from .errors import AdbError, AdbInstallError
 
@@ -572,7 +572,23 @@ class Sync():
         """ read content of a file """
         return self.read_bytes(path).decode(encoding=encoding)
 
-    def pull(self, src: str, dst: typing.Union[str, pathlib.Path]) -> int:
+    def pull(self, src: str, dst: typing.Union[str, pathlib.Path], exist_ok: bool = False) -> int:
+        """
+        Pull file or directory from device:src to local:dst
+
+        Returns:
+            total file size pulled
+        """
+        src_file_info = self.stat(src)
+        is_src_file = src_file_info.mode & stat.S_IFREG != 0
+        
+        if is_src_file:
+            return self.pull_file(src, dst)
+        else:
+            return self.pull_dir(src, dst, exist_ok)
+
+
+    def pull_file(self, src: str, dst: typing.Union[str, pathlib.Path]) -> int:
         """
         Pull file from device:src to local:dst
 
@@ -587,6 +603,49 @@ class Sync():
                 f.write(chunk)
                 size += len(chunk)
             return size
+        
+    def pull_dir(self, src: str, dst: typing.Union[str, pathlib.Path], exist_ok: bool = True) -> int:
+        """Pull directory from device:src into local:dst
+
+        Returns:
+            total files size pulled
+        """
+
+        def rec_pull_contents(src: str, dst: typing.Union[str, pathlib.Path], exist_ok: bool = True) -> int:
+            s = 0
+            items = list(self.iter_directory(src))
+
+            dirs = list(
+                filter(
+                    lambda f: stat.S_IFDIR & f.mode != 0,
+                    items
+                ))
+            files = list(
+                filter(
+                    lambda f: stat.S_IFREG & f.mode != 0,
+                    items
+                ))
+            
+            for dir in dirs:
+                new_src:str = append_path(src, dir.path) # type: ignore (NB: append path output type is whatever the src parameter is)
+                new_dst:typing.Union[str, pathlib.Path] = append_path(dst, dir.path) 
+                os.makedirs(new_dst, exist_ok=exist_ok)
+                s += rec_pull_contents(new_src, new_dst ,exist_ok=exist_ok)
+
+            for file in files:
+                new_src:str = append_path(src, file.path) # type: ignore (NB: append path output type is whatever the src parameter is)
+                new_dst:typing.Union[str, pathlib.Path] = append_path(dst, file.path) 
+                s += self.pull_file(new_src, new_dst)
+
+            return s
+
+
+        if isinstance(dst, str):
+            dst = pathlib.Path(dst)
+        os.makedirs(dst, exist_ok=exist_ok)
+
+        return rec_pull_contents(src, dst, exist_ok=exist_ok)
+
 
 
 class AbstractScreenRecord:
@@ -633,7 +692,7 @@ class AdbDevice(BaseDevice):
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 target_path = os.path.join(tmpdir, "adbutils-tmp.png")
-                self.sync.pull(inner_tmp_path, target_path)
+                self.sync.pull_file(inner_tmp_path, target_path)
                 im = Image.open(target_path)
                 im.load()
                 return im.convert("RGB")
