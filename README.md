@@ -197,6 +197,14 @@ d.get_devpath() # same as adb get-devpath
 d.get_state() # same as adb get-state
 ```
 
+Take screenshot
+
+```bash
+# adb exec-out screencap -p p.png
+png_data = d.shell("screencap -p", encoding=None)
+pathlib.Path("p.png").write_bytes(png_data)
+```
+
 ## Transfer files
 ```python
 d.sync.push(b"Hello Android", "/data/local/tmp/hi.txt") # 推送二进制文本
