@@ -4,6 +4,8 @@
 """Created on Fri May 06 2022 10:58:29 by codeskyblue
 """
 
+from __future__ import annotations
+
 import os
 import socket
 import subprocess
@@ -119,14 +121,18 @@ class AdbConnection(object):
         size = int(length, 16)
         return self.read_string(size)
 
-    def read_until_close(self, encoding: str = "utf-8") -> str:
+    def read_until_close(self, encoding: str | None = "utf-8") -> Union[str, bytes]:
+        """
+        read until connection close
+        :param encoding: default utf-8, if pass None, return bytes
+        """
         content = b""
         while True:
             chunk = self.read(4096)
             if not chunk:
                 break
             content += chunk
-        return content.decode(encoding, errors='replace')
+        return content.decode(encoding, errors='replace') if encoding else content
 
     def check_okay(self):
         data = self.read_string(4)

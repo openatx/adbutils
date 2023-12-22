@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Created on Fri May 06 2022 11:39:40 by codeskyblue
 """
+from __future__ import annotations
 
 __all__ = [
     "Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
@@ -89,7 +90,7 @@ class ShellReturn:
     """
     command: str
     returncode: int
-    output: str
+    output: str | bytes
 
 
 @dataclass

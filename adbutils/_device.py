@@ -3,6 +3,8 @@
 """Created on Fri May 06 2022 10:33:39 by codeskyblue
 """
 
+from __future__ import annotations
+
 import abc
 import dataclasses
 import datetime
@@ -176,13 +178,16 @@ class BaseDevice:
               cmdargs: Union[str, list, tuple],
               stream: bool = False,
               timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
-              rstrip=True) -> typing.Union[AdbConnection, str]:
+              encoding: str | None = "utf-8",
+              rstrip=True) -> typing.Union[AdbConnection, str, bytes]:
         """Run shell inside device and get it's content
 
         Args:
             rstrip (bool): strip the last empty line (Default: True)
             stream (bool): return stream instead of string output (Default: False)
             timeout (float): set shell timeout
+            encoding (str): set output encoding (Default: utf-8), set None to make return bytes
+            rstrip (bool): strip the last empty line, only work when encoding is set
 
         Returns:
             string of output when stream is False
@@ -205,15 +210,23 @@ class BaseDevice:
         c.check_okay()
         if stream:
             return c
-        output = c.read_until_close()
-        return output.rstrip() if rstrip else output
+        output = c.read_until_close(encoding=encoding)
+        if encoding:
+            return output.rstrip() if rstrip else output
+        return output
 
     def shell2(self,
                cmdargs: Union[str, list, tuple],
                timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+               encoding: str | None = "utf-8",
                rstrip=False) -> ShellReturn:
         """
         Run shell command with detail output
+        Args:
+            cmdargs (str | list | tuple): command args
+            timeout (float): set shell timeout, seconds
+            encoding (str): set output encoding (Default: utf-8), set None to make return bytes
+            rstrip (bool): strip the last empty line, only work when encoding is set
 
         Returns:
             ShellOutput
@@ -226,13 +239,13 @@ class BaseDevice:
         assert isinstance(cmdargs, str)
         MAGIC = "X4EXIT:"
         newcmd = cmdargs + f"; echo {MAGIC}$?"
-        output = self.shell(newcmd, timeout=timeout, rstrip=True)
-        rindex = output.rfind(MAGIC)
+        output = self.shell(newcmd, timeout=timeout, encoding=encoding, rstrip=True)
+        rindex = output.rfind(MAGIC if encoding else MAGIC.encode())
         if rindex == -1:  # normally will not possible
             raise AdbError("shell output invalid", output)
         returncoode = int(output[rindex + len(MAGIC):])
         output = output[:rindex]
-        if rstrip:
+        if rstrip and encoding:
             output = output.rstrip()
         return ShellReturn(command=cmdargs,
                            returncode=returncoode,

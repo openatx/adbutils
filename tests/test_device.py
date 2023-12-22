@@ -23,6 +23,15 @@ def test_shell(device: AdbDevice):
     output = device.shell("pwd", rstrip=False)
     assert output in ["/\n", "/\r\n"]
 
+
+def test_shell_without_encoding(device: AdbDevice):
+    output = device.shell("echo -n hello", encoding=None)
+    assert output == b"hello"
+
+    ret = device.shell2("echo -n hello", encoding=None)
+    assert ret.output == b"hello"
+
+
 def test_shell_stream(device: AdbDevice):
     c = device.shell(["echo", "-n", "hello world"], stream=True)
     output = c.read_until_close()
