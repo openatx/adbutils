@@ -54,15 +54,3 @@ def local_src_in_dir(tmpdir):
     cb = c.mkdir('cb')
 
     yield tmpdir
-
-# @pytest.fixture
-# def local_src_out_dir1(tmpdir):
-#     local_src_out_dir1 = pathlib.Path('tests/test-assets/test_d1')
-#     yield local_src_out_dir1
-#     subprocess.check_output(['rm', '-r', local_src_out_dir1])
-
-# @pytest.fixture
-# def local_src_out_dir2(tmpdir):
-#     local_src_out_dir2 = pathlib.Path('tests/test-assets/test_d2')
-#     yield local_src_out_dir2
-#     subprocess.check_output(['rm', '-r', local_src_out_dir2])
