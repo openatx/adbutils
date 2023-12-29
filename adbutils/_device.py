@@ -632,14 +632,14 @@ class Sync():
                 ))
             
             for dir in dirs:
-                new_src:str = append_path(src, dir.path) # type: ignore (NB: append path output type is whatever the src parameter is)
-                new_dst:typing.Union[str, pathlib.Path] = append_path(dst, dir.path) 
+                new_src:str = append_path(src, dir.path) 
+                new_dst:pathlib.Path = pathlib.Path(append_path(dst, dir.path)) 
                 os.makedirs(new_dst, exist_ok=exist_ok)
                 s += rec_pull_contents(new_src, new_dst ,exist_ok=exist_ok)
 
             for file in files:
-                new_src:str = append_path(src, file.path) # type: ignore (NB: append path output type is whatever the src parameter is)
-                new_dst:typing.Union[str, pathlib.Path] = append_path(dst, file.path) 
+                new_src:str = append_path(src, file.path) 
+                new_dst:str = append_path(dst, file.path) 
                 s += self.pull_file(new_src, new_dst)
 
             return s

@@ -20,17 +20,10 @@ from pkg_resources import resource_filename
 
 MB = 1024 * 1024
 
-@typing.overload
-def append_path(base: str, addition:str) -> str:
-    ...
 
-@typing.overload
-def append_path(base: pathlib.Path, addition:str) -> pathlib.Path:
-    ...
-
-def append_path(base: typing.Union[str, pathlib.Path], addition: str) -> typing.Union[str, pathlib.Path]:
+def append_path(base: typing.Union[str, pathlib.Path], addition: str) -> str:
     if isinstance(base, pathlib.Path):
-        return base / addition
+        return str(base / addition)
     else:
         return base + '/' + addition if base[-1] != '/' else base + addition
 

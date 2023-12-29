@@ -217,8 +217,7 @@ def test_pull_push_dirs(
         device: AdbDevice, 
         device_tmp_dir_path:str, 
         local_src_in_dir:pathlib.Path, 
-        local_src_out_dir1:pathlib.Path, 
-        local_src_out_dir2:pathlib.Path
+        tmp_path:pathlib.Path, 
     ):
 
     def are_dir_trees_equal(dir1, dir2):
@@ -250,9 +249,11 @@ def test_pull_push_dirs(
             if not are_dir_trees_equal(new_dir1, new_dir2):
                 return False
         return True
+    
+    local_src_out_dir1 = tmp_path / 'dir1'
+    local_src_out_dir2 = tmp_path / 'dir2'
 
-
-    device.push(local_src_in_dir.absolute().__str__(), device_tmp_dir_path)
+    device.push(local_src_in_dir, device_tmp_dir_path)
 
     device.sync.pull_dir(device_tmp_dir_path, local_src_out_dir1)
 
