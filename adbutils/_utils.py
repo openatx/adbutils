@@ -23,7 +23,7 @@ MB = 1024 * 1024
 
 def append_path(base: typing.Union[str, pathlib.Path], addition: str) -> str:
     if isinstance(base, pathlib.Path):
-        return str(base / addition)
+        return (base / addition).as_posix()
     else:
         return base + '/' + addition if base[-1] != '/' else base + addition
 
