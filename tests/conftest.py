@@ -2,8 +2,6 @@
 
 import pytest
 from adbutils import adb, AdbDevice
-import subprocess
-import pathlib
 
 
 @pytest.fixture(scope="session")
