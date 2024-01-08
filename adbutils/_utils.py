@@ -10,6 +10,8 @@ import threading
 import time
 import typing
 import zipfile
+import typing
+import pathlib
 
 import whichcraft
 from apkutils2.axml.axmlparser import AXML
@@ -17,6 +19,13 @@ from apkutils2.manifest import Manifest
 from pkg_resources import resource_filename
 
 MB = 1024 * 1024
+
+
+def append_path(base: typing.Union[str, pathlib.Path], addition: str) -> str:
+    if isinstance(base, pathlib.Path):
+        return (base / addition).as_posix()
+    else:
+        return base + '/' + addition if base[-1] != '/' else base + addition
 
 def humanize(n: int) -> str:
     return '%.1f MB' % (float(n) / MB)
