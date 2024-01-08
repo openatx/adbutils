@@ -18,9 +18,9 @@ from deprecation import deprecated
 from adbutils._utils import adb_path
 from adbutils.errors import AdbError, AdbTimeout
 
-from ._proto import *
-from ._utils import list2cmdline
-from ._version import __version__
+from adbutils._proto import *
+from adbutils._utils import list2cmdline
+from adbutils._version import __version__
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"

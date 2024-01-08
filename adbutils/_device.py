@@ -34,6 +34,7 @@ import apkutils2
 import requests
 from deprecation import deprecated
 from PIL import Image
+
 try:
     from PIL import UnidentifiedImageError
 except ImportError:
@@ -42,13 +43,14 @@ except ImportError:
 
 from retry import retry
 
-from ._adb import AdbConnection, BaseClient
-from ._proto import *
-from ._proto import StrOrPathLike, AppInfo
-from ._utils import (APKReader, ReadProgress, StopEvent, adb_path,
-                     get_free_port, humanize, list2cmdline, append_path)
-from ._version import __version__
-from .errors import AdbError, AdbInstallError
+from adbutils._adb import AdbConnection, BaseClient
+from adbutils._proto import *
+from adbutils._proto import AppInfo, StrOrPathLike
+from adbutils._utils import (APKReader, ReadProgress, StopEvent, adb_path,
+                             append_path, get_free_port, humanize,
+                             list2cmdline)
+from adbutils._version import __version__
+from adbutils.errors import AdbError, AdbInstallError
 
 _DISPLAY_RE = re.compile(
     r'.*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*'
@@ -1290,7 +1292,7 @@ class AdbDevice(BaseDevice):
         """ rm device file """
         self.shell(["rm", path])
 
-    def remove_dir(self, path: str):
+    def rmtree(self, path: str):
         """ rm -r directory"""
         self.shell(["rm", "-r", path])
 

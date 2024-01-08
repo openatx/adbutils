@@ -6,7 +6,6 @@ from adbutils import adb, AdbDevice
 
 @pytest.fixture(scope="session")
 def device():
-    print("Fixture device")
     return adb.device()
 
 
@@ -20,11 +19,10 @@ def device_tmp_path(device: AdbDevice):
 def device_tmp_dir_path(device: AdbDevice):
     tmp_dir_path = "/sdcard/test_d"
     yield tmp_dir_path
-    device.remove_dir(tmp_dir_path)
+    device.rmtree(tmp_dir_path)
 
 @pytest.fixture
 def local_src_in_dir(tmpdir):
-
     tmpdir.join('1.txt').write('1\n')
     tmpdir.join('2.txt').write('2\n')
     tmpdir.join('3.txt').write('3\n')
