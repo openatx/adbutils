@@ -244,7 +244,7 @@ class BaseDevice:
         output = self.shell(newcmd, timeout=timeout, encoding=encoding, rstrip=True)
         rindex = output.rfind(MAGIC if encoding else MAGIC.encode())
         if rindex == -1:  # normally will not possible
-            raise AdbError("shell output invalid", output)
+            raise AdbError("shell output invalid", newcmd, output)
         returncoode = int(output[rindex + len(MAGIC):])
         output = output[:rindex]
         if rstrip and encoding:
