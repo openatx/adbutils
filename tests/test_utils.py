@@ -4,9 +4,10 @@
 """Created on Fri Dec 02 2022 17:00:03 by codeskyblue
 """
 
+import os
 import pytest
 from adbutils import StopEvent
-from adbutils._utils import get_free_port
+from adbutils._utils import get_free_port, _get_bin_dir
 
 
 def test_stop_event():
@@ -29,3 +30,9 @@ def test_stop_event():
 def test_get_free_port():
     port = get_free_port()
     assert port > 0
+
+
+def test_get_bin_dir():
+    _dir = _get_bin_dir()
+    assert isinstance(_dir, str)
+    assert "README.md" in os.listdir(_dir)
