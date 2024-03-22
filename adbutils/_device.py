@@ -786,7 +786,7 @@ class AdbDevice(BaseDevice):
     def __is_percent(self, v):
         return isinstance(v, float) and v <= 1.0
     
-    def click(self, x, y):
+    def click(self, x, y) -> None:
         """
         simulate android tap
 
@@ -799,9 +799,9 @@ class AdbDevice(BaseDevice):
             x = int(x * w) if is_percent(x) else x
             y = int(y * h) if is_percent(y) else y
         x, y = map(str, [x, y])
-        return self.shell(['input', 'tap', x, y])
+        self.shell(['input', 'tap', x, y])
 
-    def swipe(self, sx, sy, ex, ey, duration: float = 1.0):
+    def swipe(self, sx, sy, ex, ey, duration: float = 1.0) -> None:
         """
         swipe from start point to end point
 
@@ -817,7 +817,7 @@ class AdbDevice(BaseDevice):
             ex = int(ex * w) if is_percent(ex) else ex
             ey = int(ey * h) if is_percent(ey) else ey
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
-        return self.shell(
+        self.shell(
             ['input', 'swipe', x1, y1, x2, y2,
              str(int(duration * 1000))])
 
@@ -1225,15 +1225,19 @@ class AdbDevice(BaseDevice):
         Raises:
             AdbError
         """
+        target = '/data/local/tmp/uidump.xml'
         output = self.shell(
-            'uiautomator dump /data/local/tmp/uidump.xml && echo success')
-        if "success" not in output:
+            f'rm -f {target}; uiautomator dump {target} && echo success')
+        if 'ERROR' in output or 'success' not in output:
             raise AdbError("uiautomator dump failed", output)
 
         buf = b''
-        for chunk in self.sync.iter_content("/data/local/tmp/uidump.xml"):
+        for chunk in self.sync.iter_content(target):
             buf += chunk
-        return buf.decode("utf-8")
+        xml_data = buf.decode("utf-8")
+        if not xml_data.startswith('<?xml'):
+            raise AdbError("dump output is not xml", xml_data)
+        return xml_data
 
     @retry(AdbError, delay=.5, tries=3, jitter=.1)
     def app_current(self) -> RunningAppInfo:

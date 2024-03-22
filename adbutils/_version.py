@@ -4,10 +4,10 @@
 """Created on Fri May 06 2022 10:54:04 by codeskyblue
 """
 
-import pkg_resources
 
+from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = pkg_resources.get_distribution("adbutils").version
-except pkg_resources.DistributionNotFound:
+    __version__ = version("adbutils")
+except PackageNotFoundError:
     __version__ = "unknown"

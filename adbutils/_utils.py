@@ -1,4 +1,5 @@
 import hashlib
+import importlib.resources
 import os
 import random
 import shlex
@@ -16,7 +17,7 @@ import pathlib
 import whichcraft
 from apkutils2.axml.axmlparser import AXML
 from apkutils2.manifest import Manifest
-from pkg_resources import resource_filename
+
 
 MB = 1024 * 1024
 
@@ -74,6 +75,18 @@ def current_ip():
     finally:
         s.close()
 
+def _get_bin_dir():
+    if sys.version_info < (3, 9):
+        context = importlib.resources.path("adbutils.binaries", "__init__.py")
+    else:
+        ref = importlib.resources.files("adbutils.binaries") / "__init__.py"
+        context = importlib.resources.as_file(ref)
+    with context as path:
+        pass
+    # Return the dir. We assume that the data files are on a normal dir on the fs.
+    return str(path.parent)
+
+
 def adb_path():
     # 0. check env: ADBUTILS_ADB_PATH
     if os.getenv("ADBUTILS_ADB_PATH"):
@@ -85,7 +98,7 @@ def adb_path():
         return exe
     
     # 2. use buildin adb
-    bin_dir = resource_filename("adbutils", "binaries")
+    bin_dir = _get_bin_dir()
     exe = os.path.join(bin_dir, "adb.exe" if os.name == 'nt' else 'adb')
     if os.path.isfile(exe) and _is_valid_exe(exe):
         return exe

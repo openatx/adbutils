@@ -16,4 +16,4 @@ print("setup.py arguments:", sys.argv)
 if sys.argv[-1] == "build_wheel":
     subprocess.call([sys.executable, "build_wheel.py"])
 else:
-    setuptools.setup(setup_requires=['pbr'], python_requires='>=3.7', pbr=True)
+    setuptools.setup(setup_requires=['pbr'], python_requires='>=3.8', pbr=True)
