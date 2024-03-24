@@ -84,10 +84,11 @@ def clear_binaries_dir(target_dir):
     assert os.path.basename(target_dir) == "binaries"
     
     for fname in os.listdir(target_dir):
-        if fname != "README.md":
-            print("Removing", fname, "...", end=" ")
-            os.remove(os.path.join(target_dir, fname))
-            print("done")
+        if fname == "README.md" or fname.endswith(".py"):
+            continue
+        print("Removing", fname, "...", end=" ")
+        os.remove(os.path.join(target_dir, fname))
+        print("done")
 
 
 def clean():
