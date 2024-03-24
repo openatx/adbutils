@@ -3,7 +3,7 @@ branch = true
 
 [report]
 # Regexes for lines to exclude from consideration
-exclude_also = [
+exclude_also =
     # Don't complain about missing debug-only code:
     "def __repr__",
     "if self\\.debug",
@@ -18,7 +18,6 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
-    ]
 
 ignore_errors = true
 omit =
