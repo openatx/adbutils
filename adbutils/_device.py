@@ -97,7 +97,7 @@ class BaseDevice:
             elif self._serial:
                 c.send_command(f"host-serial:{self._serial}:{command}")
             else:
-                raise RuntimeError
+                raise RuntimeError("should not reach here")
             c.check_okay()
         else:
             if self._transport_id:
@@ -108,7 +108,7 @@ class BaseDevice:
                 # so here use host:transport
                 c.send_command(f"host:transport:{self._serial}")
             else:
-                raise RuntimeError
+                raise RuntimeError("should not reach here")
             c.check_okay()
         return c
 
@@ -575,7 +575,7 @@ class Sync():
                     chunk_size = struct.unpack("<I", c.read(4))[0]
                     chunk = c.read(chunk_size)
                     if len(chunk) != chunk_size:
-                        raise RuntimeError("read chunk missing")
+                        raise AdbError("read chunk missing")
                     yield chunk
                 else:
                     raise AdbError("Invalid sync cmd", cmd)

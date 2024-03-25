@@ -1,4 +1,3 @@
-whichcraft
 requests
 deprecation>=2.0.6,<3.0
 retry>=0.9

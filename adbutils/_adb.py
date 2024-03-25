@@ -16,10 +16,9 @@ from typing import Iterator, Union
 from deprecation import deprecated
 
 from adbutils._utils import adb_path
-from adbutils.errors import AdbError, AdbTimeout
+from adbutils.errors import AdbConnectionError, AdbError, AdbTimeout
 
 from adbutils._proto import *
-from adbutils._utils import list2cmdline
 from adbutils._version import __version__
 
 _OKAY = "OKAY"
@@ -30,13 +29,13 @@ def _check_server(host: str, port: int) -> bool:
     """ Returns if server is running """
     s = socket.socket()
     try:
+        s.settimeout(.1)
         s.connect((host, port))
         return True
-    except socket.error as e:
+    except (socket.timeout, socket.error) as e:
         return False
     finally:
         s.close()
-
 
 
 class AdbConnection(object):
@@ -52,16 +51,20 @@ class AdbConnection(object):
         adb_port = self.__port
         s = socket.socket()
         try:
+            s.settimeout(.1) # prevent socket hang
             s.connect((adb_host, adb_port))
+            s.settimeout(None)
             return s
-        except:
-            s.close()
-            raise
+        except socket.timeout as e:
+            raise AdbTimeout("connect to adb server timeout")
+        except socket.error as e:
+            raise AdbConnectionError("connect to adb server failed: %s" % e)
+
 
     def _safe_connect(self):
         try:
             return self._create_socket()
-        except ConnectionRefusedError:
+        except AdbConnectionError:
             subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             return self._create_socket()
 

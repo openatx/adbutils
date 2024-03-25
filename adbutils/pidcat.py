@@ -23,7 +23,6 @@ limitations under the License.
 import argparse
 import sys
 import re
-import subprocess
 from subprocess import PIPE
 
 import adbutils
