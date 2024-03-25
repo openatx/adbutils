@@ -76,9 +76,9 @@ class AdbClient(_BaseClient):
         if not serial:
             ds = self.device_list()
             if len(ds) == 0:
-                raise RuntimeError("Can't find any android device/emulator")
+                raise AdbError("Can't find any android device/emulator")
             if len(ds) > 1:
-                raise RuntimeError(
+                raise AdbError(
                     "more than one device/emulator, please specify the serial number"
                 )
             return ds[0]

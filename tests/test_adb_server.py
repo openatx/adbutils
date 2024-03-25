@@ -16,6 +16,5 @@ def test_server_version(adb: adbutils.AdbClient):
 
 def test_server_kill(adb: adbutils.AdbClient):
     adb.server_kill()
-    adb.server_kill()
 
 

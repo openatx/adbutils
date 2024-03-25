@@ -18,6 +18,8 @@ from shutil import which
 from apkutils2.axml.axmlparser import AXML
 from apkutils2.manifest import Manifest
 
+from adbutils.errors import AdbError
+
 
 MB = 1024 * 1024
 
@@ -52,7 +54,7 @@ def get_free_port():
             port = random.randint(10000, 20000)
             if not is_port_in_use(port):
                 return port
-        raise RuntimeError("No free port found")
+        raise AdbError("No free port found")
 
 
 def list2cmdline(args: typing.Union[list, tuple]):
@@ -103,7 +105,7 @@ def adb_path():
     if os.path.isfile(exe) and _is_valid_exe(exe):
         return exe
 
-    raise RuntimeError("No adb exe could be found. Install adb on your system")
+    raise AdbError("No adb exe could be found. Install adb on your system")
 
 
 def _popen_kwargs(prevent_sigint=False):
