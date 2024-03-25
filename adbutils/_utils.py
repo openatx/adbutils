@@ -14,7 +14,7 @@ import zipfile
 import typing
 import pathlib
 
-import whichcraft
+from shutil import which
 from apkutils2.axml.axmlparser import AXML
 from apkutils2.manifest import Manifest
 
@@ -93,7 +93,7 @@ def adb_path():
         return os.getenv("ADBUTILS_ADB_PATH")
         
     # 1. find in $PATH
-    exe = whichcraft.which("adb")
+    exe = which("adb")
     if exe and _is_valid_exe(exe):
         return exe
     

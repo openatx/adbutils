@@ -19,7 +19,6 @@ from adbutils._utils import adb_path
 from adbutils.errors import AdbError, AdbTimeout
 
 from adbutils._proto import *
-from adbutils._utils import list2cmdline
 from adbutils._version import __version__
 
 _OKAY = "OKAY"
@@ -52,16 +51,18 @@ class AdbConnection(object):
         adb_port = self.__port
         s = socket.socket()
         try:
+            s.settimeout(.1) # prevent socket hang
             s.connect((adb_host, adb_port))
+            s.settimeout(None)
             return s
-        except:
-            s.close()
-            raise
+        except socket.timeout as e:
+            raise AdbTimeout("connect to adb server timeout")
+
 
     def _safe_connect(self):
         try:
             return self._create_socket()
-        except ConnectionRefusedError:
+        except ConnectionError:
             subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             return self._create_socket()
 

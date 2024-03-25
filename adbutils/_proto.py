@@ -6,7 +6,7 @@ from __future__ import annotations
 
 __all__ = [
     "Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
-    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo"
+    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo"
 ]
 
 import enum

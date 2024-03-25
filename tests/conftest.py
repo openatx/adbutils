@@ -31,12 +31,14 @@ def wait_for_port(port, timeout:float=3, ready: bool = True):
         
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def adb_server_fixture():
     th = threading.Thread(target=run_adb_server, name='mock-adb-server')
     th.daemon = True
     th.start()
     wait_for_port(7305)
+    yield
+    adbutils.AdbClient(port=7305).server_kill()
 
 
 
