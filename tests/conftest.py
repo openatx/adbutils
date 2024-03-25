@@ -4,24 +4,31 @@
 import logging
 import threading
 import adbutils
-from adbutils.server import run_adb_server
 import pytest
 import time
 import socket
+from adb_server import run_adb_server
 
 
-def wait_for_port(port, timeout=10):
+def check_port(port) -> bool:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.1)
+            s.connect(('127.0.0.1', port))
+        return True
+    except (ConnectionRefusedError, OSError, socket.timeout):
+        return False
+    
+
+def wait_for_port(port, timeout:float=3, ready: bool = True):
     start_time = time.time()
     while True:
         if time.time() - start_time > timeout:
             raise TimeoutError(f"Port {port} is not being listened to within {timeout} seconds")
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.1)
-                s.connect(('localhost', port))
+        if check_port(port) == ready:
             return
-        except (ConnectionRefusedError, OSError, socket.timeout):
-            time.sleep(0.1)
+        time.sleep(0.1)
+        
 
 
 @pytest.fixture(scope='session')
