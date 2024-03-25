@@ -17,6 +17,10 @@ class AdbTimeout(AdbError):
     """ timeout when communicate to adb-server """
 
 
+class AdbConnectionError(AdbError):
+    """ connection error """
+
+
 class AdbInstallError(AdbError):
     def __init__(self, output: str):
         """
