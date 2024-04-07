@@ -254,3 +254,49 @@ class StopEvent:
     def reset(self):
         self.__stop.clear()
         self.__done.clear()
+
+
+def escape_special_characters(text: str) -> str:
+    """
+    A helper that escape special characters
+
+    Args:
+        text: str
+    """
+    escaped = text.translate(
+        str.maketrans({
+            "-": r"\-",
+            "+": r"\+",
+            "[": r"\[",
+            "]": r"\]",
+            "(": r"\(",
+            ")": r"\)",
+            "{": r"\{",
+            "}": r"\}",
+            "\\": r"\\\\",
+            "^": r"\^",
+            "$": r"\$",
+            "*": r"\*",
+            ".": r"\.",
+            ",": r"\,",
+            ":": r"\:",
+            "~": r"\~",
+            ";": r"\;",
+            ">": r"\>",
+            "<": r"\<",
+            "%": r"\%",
+            "#": r"\#",
+            "\'": r"\\'",
+            "\"": r'\\"',
+            "`": r"\`",
+            "!": r"\!",
+            "?": r"\?",
+            "|": r"\|",
+            "=": r"\=",
+            "@": r"\@",
+            "/": r"\/",
+            "_": r"\_",
+            " ": r"%s",  # special
+            "&": r"\&"
+        }))
+    return escaped

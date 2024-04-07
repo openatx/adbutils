@@ -61,6 +61,9 @@ def test_get_xxx(device: AdbDevice):
 def test_keyevent(device: AdbDevice):
     # make sure no error raised
     device.keyevent(4)
+    device.volume_up()
+    device.volume_down()
+    device.volume_mute()
 
 
 def test_switch_screen(device: AdbDevice):
@@ -161,15 +164,6 @@ def test_sync_pull_file_push(device: AdbDevice, device_tmp_path, tmp_path: pathl
 def test_screenshot(device: AdbDevice):
     im = device.screenshot()
     assert im.mode == "RGB"
-
-
-@pytest.mark.skip("huawei is not supported")
-def test_screenrecord(device: AdbDevice, tmp_path: pathlib.Path):
-    r = device.screenrecord()
-    time.sleep(5)
-    target_path = tmp_path.joinpath("video.mp4")
-    r.stop_and_pull(target_path)
-    assert target_path.exists()
     
 
 def test_app_info(device: AdbDevice):

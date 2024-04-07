@@ -4,19 +4,22 @@
 """Created on Mon May 09 2022 17:31:25 by codeskyblue
 """
 
+import pytest
 from adbutils import AdbDevice, adb
 
 
+@pytest.mark.skip("package_info is removed")
 def test_package_info(device: AdbDevice):
     pinfo = device.app_current()
     pinfo = device.package_info(pinfo.package)
     assert 'version_name' in pinfo
 
 
-# def test_current_app(device: AdbDevice):
-#     info = device.current_app()
-#     assert 'package' in info
-#     assert 'activity' in info
+@pytest.mark.skip("current_app is removed")
+def test_current_app(device: AdbDevice):
+    info = device.current_app()
+    assert 'package' in info
+    assert 'activity' in info
 
 
 def test_client_shell():

@@ -227,7 +227,7 @@ output = d.sync.read_bytes("/data/local/tmp/hi.txt")
 d.sync.pull("/data/local/tmp/hi.txt", "hi.txt")
 
 # 获取包的信息
-info = d.package_info("com.example.demo")
+info = d.app_info("com.example.demo")
 if info:
     print(info) 
 	# output example:
@@ -276,10 +276,13 @@ d.rotation()
 # example output: 1
 # other possible valus: 0, 1, 2, 3
 
-d.package_info("com.github.uiautomator")
+d.app_info("com.github.uiautomator")
 # example output: {"version_name": "1.1.7", "version_code": "1007"}
 
 d.keyevent("HOME")
+d.volume_up()
+d.volume_down()
+d.volume_mute()
 
 d.send_keys("hello world$%^&*") # simulate: adb shell input text "hello%sworld\%\^\&\*"
 
@@ -512,6 +515,15 @@ open another terminal, type the following command then you will see the socket d
 $ export ANDROID_ADB_SERVER_PORT=5577
 $ adb devices
 ```
+
+## Changes from 1.x to 2.x
+
+### Remove
+- current_app removed, use app_current instead
+- package_info removed, use app_info instead
+
+### Add
+- add volume_up, volume_down, volume_mute
 
 ## Generate TOC
 ```bash

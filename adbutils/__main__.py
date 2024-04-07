@@ -323,11 +323,11 @@ def main():
 
     elif args.current:
         package_name = d.app_current().package
-        info = d.package_info(package_name)
+        info = d.app_info(package_name)
         print(json.dumps(info, indent=4, default=str))
 
     elif args.package:
-        info = d.package_info(args.package)
+        info = d.app_info(args.package)
         print(json.dumps(info, indent=4, default=str))
 
 
