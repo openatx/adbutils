@@ -285,7 +285,7 @@ class ShellExtension(AbstractShellDevice):
 
     def app_clear(self, package_name: str):
         self.shell(["pm", "clear", package_name])
-
+    
     def app_info(self, package_name: str) -> Optional[AppInfo]:
         """
         Get app info

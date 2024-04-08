@@ -8,7 +8,6 @@ import pytest
 from adbutils import AdbDevice, adb
 
 
-@pytest.mark.skip("package_info is removed")
 def test_package_info(device: AdbDevice):
     pinfo = device.app_current()
     pinfo = device.package_info(pinfo.package)

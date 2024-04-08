@@ -520,7 +520,7 @@ $ adb devices
 
 ### Remove
 - current_app removed, use app_current instead
-- package_info removed, use app_info instead
+- package_info is going to remove, use app_info instead
 
 ### Add
 - add volume_up, volume_down, volume_mute

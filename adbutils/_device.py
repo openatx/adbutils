@@ -14,6 +14,7 @@ import typing
 from typing import Optional, Union
 
 
+from adbutils._deprecated import DeprecatedExtension
 from adbutils.install import InstallExtension
 from adbutils.screenrecord import ScreenrecordExtension
 from adbutils.screenshot import ScreenshotExtesion
@@ -450,6 +451,7 @@ class AdbDevice(
     ScreenrecordExtension,
     ScreenshotExtesion,
     InstallExtension,
+    DeprecatedExtension,
 ):
     """provide custom functions for some complex operations"""
 
