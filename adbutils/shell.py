@@ -342,7 +342,20 @@ class ShellExtension(AbstractShellDevice):
             sub_apk_paths=sub_apk_paths,
         )
         return app_info
-
+    
+    
+    def get_current_activity(self) -> str:
+        '''
+        Get the currently active activity on the device.
+        '''
+        activity_info = self.shell(["dumpsys", "activity", "activities"])
+        activity_info = activity_info.splitlines()
+        resumed_activity_lines = [line for line in activity_info if "mResumedActivity" in line]
+        if not resumed_activity_lines:
+            return ""
+        resumed_activity_package = resumed_activity_lines[0].split()[3]
+        return resumed_activity_package
+    
     @retry(AdbError, delay=0.5, tries=3, jitter=0.1)
     def app_current(self) -> RunningAppInfo:
         """

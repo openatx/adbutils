@@ -292,6 +292,12 @@ d.open_browser("https://www.baidu.com") # 打开百度
 # check if screen is on
 d.is_screen_on() # 返回屏幕是否亮屏 True or False
 
+# A function to get the activity that is currently open on the screen
+
+activity = device.get_current_activity()
+while "com.whatsapp/.Conversation" != activity:
+    activity = device.get_current_activity()
+
 # adb root
 d.root()
 
