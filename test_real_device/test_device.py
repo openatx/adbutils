@@ -61,8 +61,8 @@ def test_get_xxx(device: AdbDevice):
 def test_keyevent(device: AdbDevice):
     # make sure no error raised
     device.keyevent(4)
-    device.volume_up()
-    device.volume_down()
+    device.volume_up(2)
+    device.volume_down(3)
     device.volume_mute()
 
 
