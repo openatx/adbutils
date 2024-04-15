@@ -6,7 +6,7 @@
 
 
 import abc
-import datetime
+import time, datetime
 import json
 import re
 from typing import List, Optional, Union
@@ -46,11 +46,25 @@ class ShellExtension(AbstractShellDevice):
         """adb shell input keyevent KEY_CODE"""
         self.shell(["input", "keyevent", str(key_code)])
 
-    def volume_up(self):
-        self.shell("input keyevent VOLUME_UP")
+    def volume_up(self, times: int = 1):
+        """
+        Increase the volume by times step
+        :param times: times to increase volume，default is 1(Wake up volume bar).
+        :return:
+        """
+        for i in range(times):
+            self.shell("input keyevent VOLUME_UP")
+            time.sleep(0.5)
 
-    def volume_down(self):
-        self.shell("input keyevent VOLUME_DOWN")
+    def volume_down(self, times: int = 1):
+        """
+        Decrease the volume by times step
+        :param times: times to decrease volume，default is 1(Wake up volume bar).
+        :return:
+        """
+        for i in range(times):
+            self.shell("input keyevent VOLUME_DOWN")
+            time.sleep(0.5)
 
     def volume_mute(self):
         self.shell("input keyevent VOLUME_MUTE")
