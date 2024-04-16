@@ -13,6 +13,7 @@ import threading
 import typing
 from typing import Optional, Union
 
+from PIL import Image
 
 from adbutils._deprecated import DeprecatedExtension
 from adbutils.install import InstallExtension
@@ -293,6 +294,51 @@ class BaseDevice:
             if len(parts) != 3:
                 continue
             yield ReverseItem(*parts[1:])
+    
+    def framebuffer(self) -> Image.Image:
+        """Capture device screen and return PIL.Image object
+
+        Raises:
+            NotImplementedError
+        """
+        # Ref: https://android.googlesource.com/platform/system/core/+/android-cts-7.0_r18/adb/framebuffer_service.cpp
+        # Ref: https://github.com/DeviceFarmer/adbkit/blob/c16081384ca34addbdab318bda3c76434b7538af/src/adb/command/host-transport/framebuffer.ts
+        c = self.open_transport()
+        c.send_command("framebuffer:")
+        c.check_okay()
+        
+        version = c.read_uint32()
+        if version == 16:
+            raise NotImplementedError("Unsupported version 16")
+        bpp = c.read_uint32() # bits per pixel
+        if bpp != 24 and bpp != 32:
+            raise NotImplementedError("Unsupported bpp(bits per pixel)", bpp)
+        size = c.read_uint32()
+        if size == 1:
+            # FIXME: what is this?
+            size = c.read_uint32()
+        width = c.read_uint32()
+        height = c.read_uint32()
+        red_offset = c.read_uint32()
+        red_length = c.read_uint32() # always 8
+        blue_offset = c.read_uint32()
+        blue_length = c.read_uint32() # always 8
+        green_offset = c.read_uint32()
+        green_length = c.read_uint32() # always 8
+        alpha_offset = c.read_uint32()
+        alpha_length = c.read_uint32()
+
+        color_format = 'RGB'
+        if blue_offset == 0:
+            color_format = 'BGR'
+        if bpp == 32 or alpha_length:
+            color_format += 'A'
+
+        if color_format != 'RGBA' and color_format != 'RGB':
+            raise NotImplementedError("Unsupported color format")
+        buffer = c.read(size)
+        image = Image.frombytes(color_format, (width, height), buffer)
+        return image
 
     def push(self, local: str, remote: str) -> str:
         return self.adb_output("push", local, remote)
@@ -460,3 +506,4 @@ class AdbDevice(
     ):
         BaseDevice.__init__(self, client, serial, transport_id)
         ScreenrecordExtension.__init__(self)
+        ScreenshotExtesion.__init__(self)
