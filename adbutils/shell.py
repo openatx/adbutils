@@ -6,9 +6,10 @@
 
 
 import abc
-import time, datetime
+import datetime
 import json
 import re
+import time
 from typing import List, Optional, Union
 from adbutils._proto import WindowSize, AppInfo, RunningAppInfo
 from adbutils.errors import AdbError, AdbInstallError
@@ -52,7 +53,7 @@ class ShellExtension(AbstractShellDevice):
         :param times: times to increase volume，default is 1(Wake up volume bar).
         :return:
         """
-        for i in range(times):
+        for _ in range(times):
             self.shell("input keyevent VOLUME_UP")
             time.sleep(0.5)
 
@@ -62,7 +63,7 @@ class ShellExtension(AbstractShellDevice):
         :param times: times to decrease volume，default is 1(Wake up volume bar).
         :return:
         """
-        for i in range(times):
+        for _ in range(times):
             self.shell("input keyevent VOLUME_DOWN")
             time.sleep(0.5)
 
