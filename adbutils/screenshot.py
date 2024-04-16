@@ -5,12 +5,11 @@
 """
 
 import abc
-import os
+import io
+from typing import Optional, Union
 from adbutils.sync import Sync
 from adbutils._proto import WindowSize
 from PIL import Image
-import threading
-import tempfile
 
 try:
     from PIL import UnidentifiedImageError
@@ -26,39 +25,38 @@ class AbstractDevice(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def shell(self, cmd: str) -> str:
+    def shell(self, cmd: str, encoding: Optional[str]) -> Union[str, bytes]:
         pass
 
     @abc.abstractmethod
     def window_size(self) -> WindowSize:
         pass
 
+    @abc.abstractmethod
+    def framebuffer(self) -> Image.Image:
+        pass
 
 class ScreenshotExtesion(AbstractDevice):
+    def __init__(self):
+        self.__framebuffer_ok = True
+
     def screenshot(self) -> Image.Image:
-        """ not thread safe
-        
-        Note:
-            screencap to file and pull is more stable then shell(stream=True)
-            Ref: https://github.com/openatx/adbutils/pull/78
+        """ Take a screenshot and return PIL.Image.Image object
         """
         try:
-            return self.__screencap()
+            pil_image = self.__screencap()
+            if pil_image.mode == "RGBA":
+                pil_image = pil_image.convert("RGB")
+            return pil_image
         except UnidentifiedImageError as e:
             wsize = self.window_size()
-            return Image.new("RGB", wsize) # return a blank image when screenshot is not allowed
-
-
+            return Image.new("RGB", wsize, (220, 120, 100))
+    
     def __screencap(self) -> Image.Image:
-        thread_id = threading.get_native_id()
-        inner_tmp_path = f"/data/local/tmp/adbutils-tmp{thread_id}.png"
-        self.shell(["screencap", "-p", inner_tmp_path])
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                target_path = os.path.join(tmpdir, "adbutils-tmp.png")
-                self.sync.pull(inner_tmp_path, target_path)
-                im = Image.open(target_path)
-                im.load()
-                return im.convert("RGB")
-        finally:
-            self.shell(['rm', inner_tmp_path])
+        if self.__framebuffer_ok:
+            try:
+                return self.framebuffer()
+            except NotImplementedError:
+                self.__framebuffer_ok = False
+        png_bytes = self.shell('screencap', encoding=None)
+        return Image.open(io.BytesIO(png_bytes))

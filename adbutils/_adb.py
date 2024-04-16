@@ -21,8 +21,8 @@ from adbutils.errors import AdbConnectionError, AdbError, AdbTimeout
 from adbutils._proto import *
 from adbutils._version import __version__
 
-_OKAY = "OKAY"
-_FAIL = "FAIL"
+_OKAY = b"OKAY"
+_FAIL = b"FAIL"
 
 
 def _check_server(host: str, port: int) -> bool:
@@ -93,6 +93,10 @@ class AdbConnection(object):
             return self._read_fully(n)
         except socket.timeout:
             raise AdbTimeout("adb read timeout")
+    
+    def read_uint32(self) -> int:
+        data = self.read(4)
+        return int.from_bytes(data, "little")
 
     def _read_fully(self, n: int) -> bytes:
         t = n
@@ -138,7 +142,7 @@ class AdbConnection(object):
         return content.decode(encoding, errors='replace') if encoding else content
 
     def check_okay(self):
-        data = self.read_string(4)
+        data = self.read(4)
         if data == _FAIL:
             raise AdbError(self.read_string_block())
         elif data == _OKAY:

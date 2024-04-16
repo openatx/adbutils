@@ -164,7 +164,12 @@ def test_sync_pull_file_push(device: AdbDevice, device_tmp_path, tmp_path: pathl
 def test_screenshot(device: AdbDevice):
     im = device.screenshot()
     assert im.mode == "RGB"
-    
+
+
+def test_framebuffer(device: AdbDevice):
+    im = device.framebuffer()
+    assert im.size
+
 
 def test_app_info(device: AdbDevice):
     pinfo = device.app_current()
