@@ -6,6 +6,7 @@
 
 import abc
 import io
+import logging
 from typing import Optional, Union
 from adbutils.sync import Sync
 from adbutils._proto import WindowSize
@@ -17,6 +18,7 @@ except ImportError:
     # fix for py37
     UnidentifiedImageError = OSError
 
+logger = logging.getLogger(__name__)
 
 class AbstractDevice(abc.ABC):
     @property
@@ -42,6 +44,7 @@ class ScreenshotExtesion(AbstractDevice):
 
     def screenshot(self) -> Image.Image:
         """ Take a screenshot and return PIL.Image.Image object
+        If capture failed, return a black image
         """
         try:
             pil_image = self.__screencap()
@@ -50,7 +53,7 @@ class ScreenshotExtesion(AbstractDevice):
             return pil_image
         except UnidentifiedImageError as e:
             wsize = self.window_size()
-            return Image.new("RGB", wsize, (220, 120, 100))
+            return Image.new("RGB", wsize, (0, 0, 0))
     
     def __screencap(self) -> Image.Image:
         if self.__framebuffer_ok:
@@ -58,5 +61,7 @@ class ScreenshotExtesion(AbstractDevice):
                 return self.framebuffer()
             except NotImplementedError:
                 self.__framebuffer_ok = False
-        png_bytes = self.shell('screencap', encoding=None)
+            except UnidentifiedImageError as e:
+                logger.warning("framebuffer error: %s", e)
+        png_bytes = self.shell('screencap -p', encoding=None)
         return Image.open(io.BytesIO(png_bytes))

@@ -13,7 +13,7 @@ import threading
 import typing
 from typing import Optional, Union
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from adbutils._deprecated import DeprecatedExtension
 from adbutils.install import InstallExtension
@@ -337,6 +337,8 @@ class BaseDevice:
         if color_format != 'RGBA' and color_format != 'RGB':
             raise NotImplementedError("Unsupported color format")
         buffer = c.read(size)
+        if len(buffer) != size:
+            raise UnidentifiedImageError("framebuffer size not match", size, len(buffer))
         image = Image.frombytes(color_format, (width, height), buffer)
         return image
 

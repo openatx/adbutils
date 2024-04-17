@@ -200,7 +200,11 @@ d.get_state() # same as adb get-state
 
 Take screenshot
 
-```bash
+```python
+# Method 1 (Recommend)
+pil_image = d.screenshot()
+
+# Method 2
 # adb exec-out screencap -p p.png
 png_data = d.shell("screencap -p", encoding=None)
 pathlib.Path("p.png").write_bytes(png_data)
