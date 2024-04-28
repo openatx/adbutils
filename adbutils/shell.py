@@ -152,19 +152,23 @@ class ShellExtension(AbstractShellDevice):
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         self.shell(["input", "swipe", x1, y1, x2, y2, str(int(duration * 1000))])
 
-    def click(self, x, y) -> None:
+    def click(self, x, y, display_id: Optional[int] = None) -> None:
         """
         simulate android tap
 
         Args:
             x, y: int
+            display_id: int, default None, see "dumpsys SurfaceFlinger --display-id" for valid display IDs
         """
         if any(map(is_percent, [x, y])):
             w, h = self.window_size()
             x = int(x * w) if is_percent(x) else x
             y = int(y * h) if is_percent(y) else y
         x, y = map(str, [x, y])
-        self.shell(["input", "tap", x, y])
+        cmdargs = ["input"]
+        if display_id is not None:
+            cmdargs.extend(['-d', str(display_id)])
+        self.shell(cmdargs + ["tap", x, y])
 
     def send_keys(self, text: str):
         """
