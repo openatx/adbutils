@@ -39,9 +39,11 @@ def test_shell_stream(device: AdbDevice):
     output = c.read_until_close()
     assert output == "hello world"
 
+
 def test_adb_shell_raise_timeout(device: AdbDevice):
     with pytest.raises(adbutils.AdbTimeout):
         device.shell("sleep 10", timeout=1.0)
+
 
 def test_shell2(device: AdbDevice):
     cmd = "echo -n 'hello'; false"
@@ -49,13 +51,17 @@ def test_shell2(device: AdbDevice):
     assert res.output == "hello"
     assert res.returncode == 1
     assert res.command == cmd
-    
+
 
 def test_get_xxx(device: AdbDevice):
     assert device.get_serialno()
     assert device.get_state() == "device"
     # adb connect device devpath is "unknown"
     # assert device.get_devpath().startswith("usb:")
+
+
+def test_battery(device: AdbDevice):
+    print(device.battery().level)
 
 
 def test_keyevent(device: AdbDevice):
@@ -126,7 +132,7 @@ def test_sync_pull_push(device: AdbDevice, device_tmp_path, tmp_path: pathlib.Pa
     target_path.write_text("Hello Android")
     dst_path = tmp_path / "dst.txt"
     dst_path.unlink(missing_ok=True)
-    
+
     device.sync.push(target_path, device_tmp_path)
     assert "Hello Android" == device.sync.read_text(device_tmp_path)
     device.sync.pull(device_tmp_path, dst_path)
@@ -136,6 +142,7 @@ def test_sync_pull_push(device: AdbDevice, device_tmp_path, tmp_path: pathlib.Pa
     for chunk in device.sync.iter_content(device_tmp_path):
         data += chunk
     assert b"Hello Android" == data
+
 
 def test_sync_pull_file_push(device: AdbDevice, device_tmp_path, tmp_path: pathlib.Path):
     src = io.BytesIO(b"Hello 1")
@@ -149,7 +156,7 @@ def test_sync_pull_file_push(device: AdbDevice, device_tmp_path, tmp_path: pathl
     target_path.write_text("Hello Android")
     dst_path = tmp_path / "dst.txt"
     dst_path.unlink(missing_ok=True)
-    
+
     device.sync.push(target_path, device_tmp_path)
     assert "Hello Android" == device.sync.read_text(device_tmp_path)
     device.sync.pull_file(device_tmp_path, dst_path)
@@ -222,12 +229,11 @@ def test_logcat(device: AdbDevice, tmp_path: pathlib.Path):
 
 # todo: make independent of already present stuff on the phone
 def test_pull_push_dirs(
-        device: AdbDevice, 
-        device_tmp_dir_path:str, 
-        local_src_in_dir:pathlib.Path, 
-        tmp_path:pathlib.Path, 
-    ):
-
+        device: AdbDevice,
+        device_tmp_dir_path: str,
+        local_src_in_dir: pathlib.Path,
+        tmp_path: pathlib.Path,
+):
     def are_dir_trees_equal(dir1, dir2):
         """
         Compare two directories recursively. Files in each directory are
@@ -244,12 +250,12 @@ def test_pull_push_dirs(
         """
 
         dirs_cmp = filecmp.dircmp(dir1, dir2)
-        if len(dirs_cmp.left_only)>0 or len(dirs_cmp.right_only)>0 or \
-            len(dirs_cmp.funny_files)>0:
+        if len(dirs_cmp.left_only) > 0 or len(dirs_cmp.right_only) > 0 or \
+                len(dirs_cmp.funny_files) > 0:
             return False
-        (_, mismatch, errors) =  filecmp.cmpfiles(
+        (_, mismatch, errors) = filecmp.cmpfiles(
             dir1, dir2, dirs_cmp.common_files, shallow=False)
-        if len(mismatch)>0 or len(errors)>0:
+        if len(mismatch) > 0 or len(errors) > 0:
             return False
         for common_dir in dirs_cmp.common_dirs:
             new_dir1 = os.path.join(dir1, common_dir)
@@ -257,7 +263,7 @@ def test_pull_push_dirs(
             if not are_dir_trees_equal(new_dir1, new_dir2):
                 return False
         return True
-    
+
     local_src_out_dir1 = tmp_path / 'dir1'
     local_src_out_dir2 = tmp_path / 'dir2'
 
@@ -269,7 +275,6 @@ def test_pull_push_dirs(
     assert local_src_out_dir1.is_dir()
 
     are_dir_trees_equal(local_src_in_dir, local_src_out_dir1)
-    
 
     device.sync.pull(device_tmp_dir_path, local_src_out_dir2)
 
@@ -277,8 +282,3 @@ def test_pull_push_dirs(
     assert local_src_out_dir2.is_dir()
 
     are_dir_trees_equal(local_src_in_dir, local_src_out_dir2)
-
-
-
-
-

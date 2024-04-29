@@ -4,20 +4,18 @@
 """Created on Sun Apr 07 2024 18:44:52 by codeskyblue
 """
 
-
 import abc
 import datetime
 import json
 import re
 import time
 from typing import List, Optional, Union
-from adbutils._proto import WindowSize, AppInfo, RunningAppInfo
+from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo
 from adbutils.errors import AdbError, AdbInstallError
 from adbutils._utils import escape_special_characters
 from retry import retry
 
 from adbutils.sync import Sync
-
 
 _DISPLAY_RE = re.compile(
     r".*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*"
@@ -214,7 +212,7 @@ class ShellExtension(AbstractShellDevice):
         )
         try:
             if output.startswith("INFO:"):
-                output = output[output.index("{") :]
+                output = output[output.index("{"):]
             data = json.loads(output)
             return data["rotation"] / 90
         except ValueError:
@@ -260,7 +258,7 @@ class ShellExtension(AbstractShellDevice):
         return self.shell(["pm", "uninstall", pkg_name])
 
     def install_remote(
-        self, remote_path: str, clean: bool = False, flags: list = ["-r", "-t"]
+            self, remote_path: str, clean: bool = False, flags: list = ["-r", "-t"]
     ):
         """
         Args:
@@ -300,7 +298,7 @@ class ShellExtension(AbstractShellDevice):
 
     def app_clear(self, package_name: str):
         self.shell(["pm", "clear", package_name])
-    
+
     def app_info(self, package_name: str) -> Optional[AppInfo]:
         """
         Get app info
@@ -438,4 +436,69 @@ class ShellExtension(AbstractShellDevice):
         if not xml_data.startswith('<?xml'):
             raise AdbError("dump output is not xml", xml_data)
         return xml_data
-    
+
+    def battery(self) -> Optional[BatteryInfo]:
+        """
+        Get battery info
+        AC powered - Indicates that the device is currently not powered by AC power. If true, it indicates that the device is connected to an AC power adapter.
+        USB powered - Indicates that the device is currently being powered or charged through the USB interface.
+        Wireless powered - Indicates that the device is not powered through wireless charging. If wireless charging is supported and currently in use, this will be true.
+        Max charging current - The maximum charging current supported by the device, usually in microamperes（ μ A).
+        Max charging voltage - The maximum charging voltage supported by the device may be in millivolts (mV).
+        Charge counter - The cumulative charge count of a battery, usually measured in milliampere hours (mAh)
+        Status - Battery status code.
+        Health - Battery health status code.
+        Present  - indicates that the battery is currently detected and installed in the device.
+        Level - The percentage of current battery level.
+        Scale - The full scale of the percentage of battery charge, indicating that the battery level is measured using 100 as the standard for full charge.
+        Voltage - The current voltage of the battery, usually measured in millivolts (mV).
+        Temperature - Battery temperature, usually measured in degrees Celsius (° C)
+        Technology - Battery type, like (Li-ion) battery
+        Returns: BatteryInfo
+        """
+        output = self.shell(["dumpsys", "battery"])
+        m_ac_powered = re.search(r"AC powered: (\w+)", output)
+        ac_powered_status = m_ac_powered.group(1) if m_ac_powered else None
+        m_usb_powered = re.search(r"USB powered: (\w+)", output)
+        usb_powered_status = m_usb_powered.group(1) if m_usb_powered else None
+        m_wireless_powered = re.search(r"Wireless powered: (\w+)", output)
+        wireless_powered_status = m_wireless_powered.group(1) if m_wireless_powered else None
+        m_max_charging_current = re.search(r"Max charging current: (\d+)", output)
+        max_charging_current = m_max_charging_current.group(1) if m_max_charging_current else None
+        m_max_charging_voltage = re.search(r"Max charging voltage: (\d+)", output)
+        max_charging_voltage = m_max_charging_voltage.group(1) if m_max_charging_voltage else None
+        m_charge_counter = re.search(r"Charge counter: (\d+)", output)
+        charge_counter = m_charge_counter.group(1) if m_charge_counter else None
+        m_status = re.search(r"status: (\d+)", output)
+        status = m_status.group(1) if m_status else None
+        m_health = re.search(r"health: (\d+)", output)
+        health = m_health.group(1) if m_health else None
+        m_present = re.search(r"present: (\w+)", output)
+        present = m_present.group(1) if m_present else None
+        m_level = re.search(r"level: (\d+)", output)
+        level = int(m_level.group(1)) if m_level else None
+        m_scale = re.search(r"scale: (\d+)", output)
+        scale = int(m_scale.group(1)) if m_scale else None
+        m_voltage = re.search(r"voltage: (\d+)", output)
+        voltage = int(m_scale.group(1)) if m_voltage else None
+        m_temperature = re.search(r"temperature: (\d+)", output)
+        temperature = m_temperature.group(1) if m_temperature else None
+        m_technology = re.search(r"technology: \s*(.*)$", output)
+        technology = m_technology.group(1).strip() if m_technology else None
+        battery_info = BatteryInfo(
+            ac_powered=ac_powered_status,
+            usb_powered=usb_powered_status,
+            wireless_powered=wireless_powered_status,
+            max_charging_current=max_charging_current,
+            max_charging_voltage=max_charging_voltage,
+            charge_counter=charge_counter,
+            status=status,
+            health=health,
+            present=present,
+            level=level,
+            scale=scale,
+            voltage=voltage,
+            temperature=temperature,
+            technology=technology,
+        )
+        return battery_info
