@@ -4,7 +4,6 @@
 """Created on Sun Apr 07 2024 18:44:52 by codeskyblue
 """
 
-
 import abc
 import datetime
 import json
@@ -17,7 +16,6 @@ from adbutils._utils import escape_special_characters
 from retry import retry
 
 from adbutils.sync import Sync
-
 
 _DISPLAY_RE = re.compile(
     r".*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*"
@@ -76,6 +74,23 @@ class ShellExtension(AbstractShellDevice):
     def switch_screen(self, enable: bool):
         """turn screen on/off"""
         return self.keyevent(224 if enable else 223)
+
+    def brightness_value(self):
+        """
+        Return screen brightness values
+        :return:
+        """
+        value = self.shell('settings get system screen_brightness')
+        return int(value.strip())
+
+    def brightness_mode(self):
+        """
+        Return screen brightness mode
+        :return:
+        1:auto, 0:manual
+        """
+        value = self.shell('settings get system screen_brightness_mode')
+        return int(value.strip())
 
     def switch_airplane(self, enable: bool):
         """turn airplane-mode on/off"""
@@ -214,7 +229,7 @@ class ShellExtension(AbstractShellDevice):
         )
         try:
             if output.startswith("INFO:"):
-                output = output[output.index("{") :]
+                output = output[output.index("{"):]
             data = json.loads(output)
             return data["rotation"] / 90
         except ValueError:
@@ -260,7 +275,7 @@ class ShellExtension(AbstractShellDevice):
         return self.shell(["pm", "uninstall", pkg_name])
 
     def install_remote(
-        self, remote_path: str, clean: bool = False, flags: list = ["-r", "-t"]
+            self, remote_path: str, clean: bool = False, flags: list = ["-r", "-t"]
     ):
         """
         Args:
@@ -300,7 +315,7 @@ class ShellExtension(AbstractShellDevice):
 
     def app_clear(self, package_name: str):
         self.shell(["pm", "clear", package_name])
-    
+
     def app_info(self, package_name: str) -> Optional[AppInfo]:
         """
         Get app info
@@ -438,4 +453,3 @@ class ShellExtension(AbstractShellDevice):
         if not xml_data.startswith('<?xml'):
             raise AdbError("dump output is not xml", xml_data)
         return xml_data
-    
