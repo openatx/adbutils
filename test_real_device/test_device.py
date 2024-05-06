@@ -220,6 +220,8 @@ def test_logcat(device: AdbDevice, tmp_path: pathlib.Path):
     assert re.compile(r"I/TAG.*hello").search(logcat_path.read_text(encoding="utf-8"))
 
 
+
+
 # todo: make independent of already present stuff on the phone
 def test_pull_push_dirs(
         device: AdbDevice, 

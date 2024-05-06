@@ -11,7 +11,7 @@ import socket
 import subprocess
 import threading
 import typing
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from PIL import Image, UnidentifiedImageError
 
@@ -73,22 +73,24 @@ class BaseDevice:
         if command:
             if self._transport_id:
                 c.send_command(f"host-transport-id:{self._transport_id}:{command}")
+                c.check_okay()
             elif self._serial:
                 c.send_command(f"host-serial:{self._serial}:{command}")
+                c.check_okay()
             else:
                 raise RuntimeError("should not reach here")
-            c.check_okay()
         else:
             if self._transport_id:
                 c.send_command(f"host:transport-id:{self._transport_id}")
+                c.check_okay()
             elif self._serial:
                 # host:tport:serial:xxx is also fine, but receive 12 bytes
                 # recv: 4f 4b 41 59 14 00 00 00 00 00 00 00              OKAY........
-                # so here use host:transport
-                c.send_command(f"host:transport:{self._serial}")
+                c.send_command(f"host:tport:serial:{self._serial}")
+                c.check_okay()
+                c.read(8)  # skip 8 bytes
             else:
                 raise RuntimeError("should not reach here")
-            c.check_okay()
         return c
 
     def _get_with_command(self, cmd: str) -> str:
@@ -234,11 +236,14 @@ class BaseDevice:
         return ShellReturn(command=cmdargs, returncode=returncoode, output=output)
 
     def forward(self, local: str, remote: str, norebind: bool = False):
-        args = ["forward"]
+        c = self.open_transport()
+        args = ["host:forward"]
         if norebind:
             args.append("norebind")
         args.append(local + ";" + remote)
-        self.open_transport(":".join(args))
+        c.send_command(":".join(args))
+        c.check_okay() # this OKAY means message was received
+        c.check_okay() # check reponse
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """forward remote port to local random port"""
@@ -255,14 +260,16 @@ class BaseDevice:
         self.forward("tcp:" + str(local_port), remote)
         return local_port
 
-    def forward_list(self) -> typing.Iterator[ForwardItem]:
+    def forward_list(self) -> List[ForwardItem]:
         c = self.open_transport("list-forward")
         content = c.read_string_block()
+        items = []
         for line in content.splitlines():
             parts = line.split()
             if len(parts) != 3:
                 continue
-            yield ForwardItem(*parts)
+            items.append(ForwardItem(*parts))
+        return items
 
     def reverse(self, remote: str, local: str, norebind: bool = False):
         """
@@ -278,25 +285,30 @@ class BaseDevice:
         Raises:
             AdbError
         """
-        args = ["forward"]
+        c = self.open_transport()
+        args = ["reverse:forward"]
         if norebind:
             args.append("norebind")
-        args.append(local + ";" + remote)
-        self.open_transport(":".join(args))
+        args.append(remote + ";" + local)
+        c.send_command(":".join(args))
+        c.check_okay() # this OKAY means message was received
+        c.check_okay() # check reponse
 
-    def reverse_list(self):
+    def reverse_list(self) -> List[ReverseItem]:
         c = self.open_transport()
         c.send_command("reverse:list-forward")
         c.check_okay()
         content = c.read_string_block()
+        items = []
         for line in content.splitlines():
             parts = line.split()
             if len(parts) != 3:
                 continue
-            yield ReverseItem(*parts[1:])
+            items.append(ReverseItem(*parts[1:]))
+        return items
     
     def framebuffer(self) -> Image.Image:
-        """Capture device screen and return PIL.Image object
+        """Capture device screen and return PIL.Image object (Not very stable)
 
         Raises:
             NotImplementedError
