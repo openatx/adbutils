@@ -1,12 +1,13 @@
 # coding: utf-8
 
 import pytest
-from adbutils import adb, AdbDevice
+from adbutils import AdbClient, adb, AdbDevice
 
 
 @pytest.fixture(scope="session")
 def device():
-    return adb.device()
+    client = AdbClient() # port=5137
+    return client.device()
 
 
 @pytest.fixture
