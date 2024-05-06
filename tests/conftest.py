@@ -3,6 +3,7 @@
 
 import logging
 import threading
+from unittest import mock
 import adbutils
 import pytest
 import time
@@ -28,7 +29,6 @@ def wait_for_port(port, timeout:float=3, ready: bool = True):
         if check_port(port) == ready:
             return
         time.sleep(0.1)
-        
 
 
 @pytest.fixture(scope='function')
