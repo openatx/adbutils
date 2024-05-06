@@ -12,7 +12,7 @@ __all__ = [
 import enum
 import datetime
 import pathlib
-import typing
+from typing import List, NamedTuple, Optional, Union
 from dataclasses import dataclass
 
 
@@ -58,35 +58,36 @@ class FileInfo:
 @dataclass
 class AppInfo:
     package_name: str
-    version_name: typing.Optional[str]
-    version_code: typing.Optional[int]
-    flags: typing.Union[str, list]
+    version_name: Optional[str]
+    version_code: Optional[int]
+    flags: Union[str, list]
     first_install_time: datetime.datetime
     last_update_time: datetime.datetime
     signature: str
     path: str
-    sub_apk_paths: typing.List[str]
+    sub_apk_paths: List[str]
 
 
 @dataclass
 class BatteryInfo:
     ac_powered: bool
     usb_powered: bool
-    wireless_powered: bool
-    max_charging_current: typing.Optional[int]
-    max_charging_voltage: typing.Optional[int]
-    charge_counter: typing.Optional[int]
-    status: typing.Optional[int]
-    health: typing.Optional[int]
-    present: bool
-    level: typing.Optional[int]
-    scale: typing.Optional[int]
-    voltage: typing.Optional[int, float]
-    temperature: typing.Optional[int, float]
-    technology: typing.Optional[str]
+    wireless_powered: Optional[bool]
+    dock_powered: Optional[bool]
+    max_charging_current: Optional[int]
+    max_charging_voltage: Optional[int]
+    charge_counter: Optional[int]
+    status: Optional[int]
+    health: Optional[int]
+    present: Optional[bool]
+    level: Optional[int]
+    scale: Optional[int]
+    voltage: Optional[int] # mV
+    temperature: Optional[float] # e.g. 25.0
+    technology: Optional[str]
 
 
-class WindowSize(typing.NamedTuple):
+class WindowSize(NamedTuple):
     width: int
     height: int
 
@@ -117,4 +118,4 @@ class AdbDeviceInfo:
     state: str
 
 
-StrOrPathLike = typing.Union[str, pathlib.Path]
+StrOrPathLike = Union[str, pathlib.Path]

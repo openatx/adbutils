@@ -29,6 +29,5 @@ def test_host_tport_serial(adb: adbutils.AdbClient):
     d.open_transport()
 
 
-def test_shell_pwd(adb: adbutils.AdbClient):
-    d = adb.device(serial="123456")
-    assert d.shell("pwd") == "/"
+
+

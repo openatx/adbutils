@@ -94,27 +94,7 @@ async def host_kill(ctx: Context):
     await ctx.server.stop()
     # os.kill(os.getpid(), signal.SIGINT)
 
-
-_DUMPSYS_BATTERY_ = """Current Battery Service state:
-  AC powered: false
-  USB powered: false
-  Wireless powered: false
-  Dock powered: false
-  Max charging current: 0
-  Max charging voltage: 0
-  Charge counter: 10000
-  status: 4
-  health: 2
-  present: true
-  level: 90
-  scale: 100
-  voltage: 5000
-  temperature: 250
-  technology: Li-ion"""
-
-
 SHELL_OUTPUTS = {
-    "dumpsys battery": _DUMPSYS_BATTERY_,
     "pwd": "/",
 }
 
