@@ -2,6 +2,7 @@
 #
 
 
+import pytest
 import adbutils
 from adb_server import encode
 
@@ -18,3 +19,16 @@ def test_server_kill(adb: adbutils.AdbClient):
     adb.server_kill()
 
 
+def test_host_tport_serial(adb: adbutils.AdbClient):
+    d = adb.device(serial="not-found")
+    # pass
+    with pytest.raises(adbutils.AdbError):
+        d.open_transport()
+
+    d = adb.device(serial="123456")
+    d.open_transport()
+
+
+def test_shell_pwd(adb: adbutils.AdbClient):
+    d = adb.device(serial="123456")
+    assert d.shell("pwd") == "/"
