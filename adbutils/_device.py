@@ -244,6 +244,9 @@ class BaseDevice:
         c.send_command(":".join(args))
         c.check_okay() # this OKAY means message was received
         c.check_okay() # check reponse
+        # when successfully forwarded, port string will response, eg: "00041237"
+        # here we just read it and ignore
+        c.read_until_close()
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """forward remote port to local random port"""
