@@ -27,6 +27,11 @@ class Network(str, enum.Enum):
     LOCAL_ABSTRACT = "localabstract"  # same as UNIX
 
 
+class BrightnessMode(int, enum.Enum):
+    AUTO = 1
+    MANUAL = 0
+
+
 @dataclass(frozen=True)
 class DeviceEvent:
     present: bool
