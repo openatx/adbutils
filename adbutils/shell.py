@@ -10,7 +10,7 @@ import json
 import re
 import time
 from typing import List, Optional, Union
-from adbutils._proto import WindowSize, AppInfo, RunningAppInfo
+from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo, BrightnessMode
 from adbutils.errors import AdbError, AdbInstallError
 from adbutils._utils import escape_special_characters
 from retry import retry
@@ -79,27 +79,45 @@ class ShellExtension(AbstractShellDevice):
     def brightness_value(self):
         """
         Return screen brightness values
-        :return:
+        :return: brightness value
+        eg: print(d.brightness_value) output：128
         """
         value = self.shell('settings get system screen_brightness')
         return int(value.strip())
 
     @brightness_value.setter
     def brightness_value(self, value: int):
+        """
+        Set screen brightness values
+        :param value: brightness value
+        eg: d.brightness_value = 128
+        """
         if not isinstance(value, int):
             raise ValueError("Brightness value must be an integer")
         if not 0 <= value <= 255:
             raise ValueError("Brightness value must be between 0 and 255")
         self.shell(f"settings put system screen_brightness {str(value)}")
 
-    def brightness_mode(self):
+    @property
+    def brightness_mode(self) -> BrightnessMode:
         """
         Return screen brightness mode
-        :return:
-        1:auto, 0:manual
+        :return: BrightnessMode.AUTO or BrightnessMode.MANUAL
         """
-        value = self.shell('settings get system screen_brightness_mode')
-        return int(value.strip())
+        value = int(self.shell('settings get system screen_brightness_mode').strip())
+        return BrightnessMode(value)
+
+    @brightness_mode.setter
+    def brightness_mode(self, mode: BrightnessMode):
+        """
+        Set screen brightness mode
+        :param mode: BrightnessMode.AUTO or BrightnessMode.MANUAL
+        eg: d.brightness_mode = BrightnessMode.AUTO
+        """
+        if isinstance(mode, BrightnessMode):
+            self.shell(f"settings put system screen_brightness_mode {mode.value}")
+        else:
+            raise ValueError("Brightness mode must be an instance of BrightnessMode")
 
     def switch_airplane(self, enable: bool):
         """turn airplane-mode on/off"""
@@ -176,19 +194,23 @@ class ShellExtension(AbstractShellDevice):
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         self.shell(["input", "swipe", x1, y1, x2, y2, str(int(duration * 1000))])
 
-    def click(self, x, y) -> None:
+    def click(self, x, y, display_id: Optional[int] = None) -> None:
         """
         simulate android tap
 
         Args:
             x, y: int
+            display_id: int, default None, see "dumpsys SurfaceFlinger --display-id" for valid display IDs
         """
         if any(map(is_percent, [x, y])):
             w, h = self.window_size()
             x = int(x * w) if is_percent(x) else x
             y = int(y * h) if is_percent(y) else y
         x, y = map(str, [x, y])
-        self.shell(["input", "tap", x, y])
+        cmdargs = ["input"]
+        if display_id is not None:
+            cmdargs.extend(['-d', str(display_id)])
+        self.shell(cmdargs + ["tap", x, y])
 
     def send_keys(self, text: str):
         """
@@ -462,3 +484,75 @@ class ShellExtension(AbstractShellDevice):
         if not xml_data.startswith('<?xml'):
             raise AdbError("dump output is not xml", xml_data)
         return xml_data
+
+    def battery(self) -> BatteryInfo:
+        """
+        Get battery info
+
+        Returns:
+            BatteryInfo
+
+        Details:
+            AC powered - Indicates that the device is currently not powered by AC power. If true, it indicates that the device is connected to an AC power adapter.
+            USB powered - Indicates that the device is currently being powered or charged through the USB interface.
+            Wireless powered - Indicates that the device is not powered through wireless charging. If wireless charging is supported and currently in use, this will be true.
+            Max charging current - The maximum charging current supported by the device, usually in microamperes（ μ A).
+            Max charging voltage - The maximum charging voltage supported by the device may be in millivolts (mV).
+            Charge counter - The cumulative charge count of a battery, usually measured in milliampere hours (mAh)
+            Status - Battery status code.
+            Health - Battery health status code.
+            Present  - indicates that the battery is currently detected and installed in the device.
+            Level - The percentage of current battery level.
+            Scale - The full scale of the percentage of battery charge, indicating that the battery level is measured using 100 as the standard for full charge.
+            Voltage - The current voltage of the battery, usually measured in millivolts (mV).
+            Temperature - Battery temperature, usually measured in degrees Celsius (° C)
+            Technology - Battery type, like (Li-ion) battery
+        """
+
+        def to_bool(v: str) -> bool:
+            return v == "true"
+
+        output = self.shell(["dumpsys", "battery"])
+        shell_kvs = {}
+        for line in output.splitlines():
+            key, val = line.strip().split(':', 1)
+            shell_kvs[key.strip()] = val.strip()
+
+        def get_key(k: str, map_function):
+            v = shell_kvs.get(k)
+            if v is not None:
+                return map_function(v)
+            return None
+
+        ac_powered = get_key("AC powered", to_bool)
+        usb_powered = get_key("USB powered", to_bool)
+        wireless_powered = get_key("Wireless powered", to_bool)
+        dock_powered = get_key("Dock powered", to_bool)
+        max_charging_current = get_key("Max charging current", int)
+        max_charging_voltage = get_key("Max charging voltage", int)
+        charge_counter = get_key("Charge counter", int)
+        status = get_key("status", int)
+        health = get_key("health", int)
+        present = get_key("present", to_bool)
+        level = get_key("level", int)
+        scale = get_key("scale", int)
+        voltage = get_key("voltage", int)
+        temperature = get_key("temperature", lambda x: int(x) / 10)
+        technology = shell_kvs.get("technology", str)
+        return BatteryInfo(
+            ac_powered=ac_powered,
+            usb_powered=usb_powered,
+            wireless_powered=wireless_powered,
+            dock_powered=dock_powered,
+            max_charging_current=max_charging_current,
+            max_charging_voltage=max_charging_voltage,
+            charge_counter=charge_counter,
+            status=status,
+            health=health,
+            present=present,
+            level=level,
+            scale=scale,
+            voltage=voltage,
+            temperature=temperature,
+            technology=technology,
+        )

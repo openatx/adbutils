@@ -7,10 +7,10 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from typing import overload
+import re
+from typing import Union, overload
 
 logger = logging.getLogger(__name__)
-
 
 
 @overload
@@ -49,7 +49,7 @@ def encode_bytes(s: bytes) -> bytes:
 
 
 
-COMMANDS: dict[str, callable] = {}
+COMMANDS: dict[Union[str, re.Pattern], callable] = {}
 
 def register_command(name: str):
     def wrapper(func):
@@ -59,10 +59,11 @@ def register_command(name: str):
 
 
 class Context:
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer" = None):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer" = None, command: str = None):
         self.reader = reader
         self.writer = writer
         self.server = server
+        self.command = command
             
     async def send(self, data: bytes):
         self.writer.write(data)
@@ -71,6 +72,10 @@ class Context:
     async def recv(self, length: int) -> bytes:
         return await self.reader.read(length)
 
+    async def recv_string_block(self) -> str:
+        length = int((await self.recv(4)).decode(), 16)
+        return (await self.recv(length)).decode()
+    
     async def close(self):
         self.writer.close()
         await self.writer.wait_closed()
@@ -89,6 +94,34 @@ async def host_kill(ctx: Context):
     await ctx.server.stop()
     # os.kill(os.getpid(), signal.SIGINT)
 
+SHELL_OUTPUTS = {
+    "pwd": "/",
+}
+
+
+@register_command(re.compile("host:tport:serial:.*"))
+async def host_tport_serial(ctx: Context):
+    serial = ctx.command.split(":")[-1]
+    if serial == "not-found":
+        await ctx.send(b"FAIL")
+        await ctx.send(encode("device not found"))
+    else:
+        await ctx.send(b"OKAY")
+        await ctx.send(b"\x00\x00\x00\x00\x00\x00\x00\x00")
+
+    cmd = await ctx.recv_string_block()
+    if not cmd.startswith("shell:"):
+        await ctx.send(b"FAIL")
+        await ctx.send(encode("unsupported command"))
+        return
+    await ctx.send(b"OKAY")
+    shell_cmd = cmd.split(":", 1)[1]
+    if shell_cmd in SHELL_OUTPUTS:
+        await ctx.send((SHELL_OUTPUTS[shell_cmd].rstrip() + "\n").encode())
+    else:
+        await ctx.send(b"unknown command")
+    
+
 
 async def handle_command(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer"):
     try:
@@ -98,14 +131,26 @@ async def handle_command(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         cmd_length = int((await reader.readexactly(4)).decode(), 16)
         command = (await reader.read(cmd_length)).decode()
         logger.info("recv command: %s", command)
-        if command not in COMMANDS:
+        command_handler: callable = None
+        command_keys = list(COMMANDS.keys())
+        logger.debug("command_keys: %s", command_keys)
+        for key in command_keys:
+            if isinstance(key, str) and key == command:
+                command_handler = COMMANDS[key]
+                break
+            elif isinstance(key, re.Pattern) and key.match(command):
+                command_handler = COMMANDS[key]
+                break
+
+        logger.debug("command_handler: %s", command_handler)
+        if command_handler is None:
             writer.write(b"FAIL")
             writer.write(encode(f"Unknown command: {command}"))
             await writer.drain()
             writer.close()
             return
-        ctx = Context(reader, writer, server)
-        await COMMANDS[command](ctx)
+        ctx = Context(reader, writer, server, command)
+        await command_handler(ctx)
         await ctx.close()
     except asyncio.IncompleteReadError:
         pass
@@ -144,8 +189,16 @@ async def adb_server():
 
 
 def run_adb_server():
-    logging.basicConfig(level=logging.DEBUG)
-    asyncio.run(adb_server())
+    try:
+        import logzero
+        logzero.setup_logger(__name__)
+    except ImportError:
+        pass
+    
+    try:
+        asyncio.run(adb_server())
+    except:
+        logger.exception("Error in adb_server")
 
 
 if __name__ == '__main__':

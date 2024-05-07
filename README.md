@@ -200,7 +200,11 @@ d.get_state() # same as adb get-state
 
 Take screenshot
 
-```bash
+```python
+# Method 1 (Recommend)
+pil_image = d.screenshot()
+
+# Method 2
 # adb exec-out screencap -p p.png
 png_data = d.shell("screencap -p", encoding=None)
 pathlib.Path("p.png").write_bytes(png_data)
@@ -297,6 +301,9 @@ d.root()
 
 # adb tcpip <port>
 d.tcpip(5555)
+
+print(d.battery())
+BatteryInfo(ac_powered=False, usb_powered=False, wireless_powered=False, dock_powered=False, max_charging_current=0, max_charging_voltage=0, charge_counter=10000, status=4, health=2, present=True, level=100, scale=100, voltage=5000, temperature=25.0, technology='Li-ion')
 ```
 
 Screenrecord (mp4)
