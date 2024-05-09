@@ -11,8 +11,14 @@ TCP Local(5555) -> Remote(localhost:5037)
 
 execute adb command, e.g. `adb -P 5555 devices`, now data should be seen in charles.
 
+ADB Protocols from Android Source Code
+
+- [OVERVIEW.TXT](https://cs.android.com/android/platform/superproject/+/main:packages/modules/adb/OVERVIEW.TXT)
+- [SERVICES.TXT](https://cs.android.com/android/platform/superproject/+/main:packages/modules/adb/SERVICES.TXT)
+- [SYNC.TXT](https://cs.android.com/android/platform/superproject/+/main:packages/modules/adb/SYNC.TXT)
+
 ## host version
-```
+```bash
 >send
 000chost:version
 
@@ -21,7 +27,7 @@ execute adb command, e.g. `adb -P 5555 devices`, now data should be seen in char
 ```
 
 ## host tport device not found
-```
+```bash
 >send
 0026host:tport:serial:GBG5T197110027690014
 
@@ -32,7 +38,7 @@ execute adb command, e.g. `adb -P 5555 devices`, now data should be seen in char
 ```
 
 ## forward
-```
+```bash
 $ adb forward --list
 >send
 0011host:list-forward
@@ -42,7 +48,8 @@ OKAY0020emulator-5554 tcp:5678 tcp:8765
 
 $ adb forward --remove-all
 >send
-000ehost:tport:any0014host:killforward-all
+000ehost:tport:any
+0014host:killforward-all
 
 <recv
 00000000  4f 4b 41 59 08 00 00 00 00 00 00 00 4f 4b 41 59   OKAY        OKAY
@@ -50,7 +57,8 @@ $ adb forward --remove-all
 
 $ adb -s emulator-5554 forward tcp:1234 tcp:4321
 >send
-001fhost:tport:serial:emulator-5554001ehost:forward:tcp:1234;tcp:4321
+001fhost:tport:serial:emulator-5554
+001ehost:forward:tcp:1234;tcp:4321
 
 <recv
 00000000  4f 4b 41 59 08 00 00 00 00 00 00 00 4f 4b 41 59   OKAY        OKAY
@@ -71,7 +79,7 @@ reverse --list           list all reverse socket connections from device
  reverse --remove-all     remove all reverse socket connections from device
 ```
 
-```
+```bash
 $ adb reverse --list
 >send
 0022host:tport:serial:GBG5T197110027690014

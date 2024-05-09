@@ -235,17 +235,7 @@ class BaseDevice:
         return ShellReturn(command=cmdargs, returncode=returncoode, output=output)
 
     def forward(self, local: str, remote: str, norebind: bool = False):
-        c = self.open_transport()
-        args = ["host:forward"]
-        if norebind:
-            args.append("norebind")
-        args.append(local + ";" + remote)
-        c.send_command(":".join(args))
-        c.check_okay() # this OKAY means message was received
-        c.check_okay() # check reponse
-        # when successfully forwarded, port string will response, eg: "00041237"
-        # here we just read it and ignore
-        c.read_until_close()
+        self._client.forward(self._serial, local, remote, norebind)
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """forward remote port to local random port"""

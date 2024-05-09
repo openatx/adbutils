@@ -342,10 +342,6 @@ class BaseClient(object):
                 items.append(ForwardItem(*parts))
             return items
 
-    @deprecated(deprecated_in="0.15.0",
-                removed_in="1.0.0",
-                details="use Device.forward instead",
-                current_version=__version__)
     def forward(self, serial, local, remote, norebind=False):
         """
         Args:
@@ -357,7 +353,7 @@ class BaseClient(object):
             AdbError
         """
         with self.make_connection() as c:
-            cmds = ["host-serial", serial, "forward"]
+            cmds = ["host-serial", serial, "forward"] # host-prefix:forward:norebind:<local>;<remote>
             if norebind:
                 cmds.append("norebind")
             cmds.append(local + ";" + remote)
