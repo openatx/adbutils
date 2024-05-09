@@ -73,10 +73,20 @@ def test_keyevent(device: AdbDevice):
 
 
 def test_brightness(device: AdbDevice):
-    device.brightness_value = 255
-    print(device.brightness_value)
-    device.brightness_mode = BrightnessMode.AUTO
-    print(device.brightness_mode)
+    current_brightness = device.brightness_value
+    device.brightness_value = 100
+    assert device.brightness_value == 100
+    device.brightness_value = current_brightness
+
+    current_mode = device.brightness_mode
+    if current_mode == BrightnessMode.AUTO:
+        device.brightness_mode = BrightnessMode.MANUAL
+        assert int(device.shell('settings get system screen_brightness_mode').strip()) == 0
+    elif current_mode == BrightnessMode.MANUAL:
+        device.brightness_mode = BrightnessMode.AUTO
+        assert int(device.shell('settings get system screen_brightness_mode').strip()) == 1
+    device.brightness_mode = current_mode
+
 
 
 def test_switch_screen(device: AdbDevice):
