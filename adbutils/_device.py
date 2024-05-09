@@ -507,4 +507,3 @@ class AdbDevice(
     ):
         BaseDevice.__init__(self, client, serial, transport_id)
         ScreenrecordExtension.__init__(self)
-        ScreenshotExtesion.__init__(self)

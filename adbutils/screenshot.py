@@ -8,6 +8,7 @@ import abc
 import io
 import logging
 from typing import Optional, Union
+from adbutils.errors import AdbError
 from adbutils.sync import Sync
 from adbutils._proto import WindowSize
 from PIL import Image
@@ -39,16 +40,17 @@ class AbstractDevice(abc.ABC):
         pass
 
 class ScreenshotExtesion(AbstractDevice):
-    def __init__(self):
-        self.__framebuffer_ok = True
-
-    def screenshot(self, display_id: Optional[int] = None) -> Image.Image:
+    def screenshot(self, display_id: Optional[int] = None, error_ok: bool = True) -> Image.Image:
         """ Take a screenshot and return PIL.Image.Image object
         Args:
             display_id: int, default None, see "dumpsys SurfaceFlinger --display-id" for valid display IDs
+            error_ok: bool, default True, if True, return a black image when capture failed
         
         Returns:
-            PIL.Image.Image object, If capture failed, return a black image
+            PIL.Image.Image object
+        
+        Raises:
+            AdbError: when capture failed and error_ok is False
         """
         try:
             pil_image = self.__screencap(display_id)
@@ -56,22 +58,17 @@ class ScreenshotExtesion(AbstractDevice):
                 pil_image = pil_image.convert("RGB")
             return pil_image
         except UnidentifiedImageError as e:
-            wsize = self.window_size()
-            return Image.new("RGB", wsize, (0, 0, 0))
+            logger.warning("screencap error: %s", e)
+            if error_ok:
+                wsize = self.window_size()
+                return Image.new("RGB", wsize, (0, 0, 0))
+            else:
+                raise AdbError("screencap error") from e
     
     def __screencap(self, display_id: int = None) -> Image.Image:
         """ Take a screenshot and return PIL.Image.Image object
         """
-        # framebuffer is not stable, so we disable it
-        # MemoryError may occur when using framebuffer
-        
-        # if self.__framebuffer_ok and display_id is None:
-        #     try:
-        #         return self.framebuffer()
-        #     except NotImplementedError:
-        #         self.__framebuffer_ok = False
-        #     except UnidentifiedImageError as e:
-        #         logger.warning("framebuffer error: %s", e)
+        # framebuffer() is not stable, so here still use screencap
         cmdargs = ['screencap', '-p']
         if display_id is not None:
             cmdargs.extend(['-d', str(display_id)])
