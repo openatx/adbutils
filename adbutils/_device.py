@@ -342,7 +342,7 @@ class BaseDevice:
     @deprecated(deprecated_in="2.6.0", removed_in="3.0.0", current_version=__version__, details="use sync.push instead")
     def push(self, local: str, remote: str):
         """ alias for sync.push """
-        self.sync.push(local, remote)
+        return self.sync.push(local, remote)
 
     def create_connection(
         self, network: Network, address: Union[int, str]

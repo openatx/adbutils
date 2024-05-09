@@ -36,3 +36,7 @@ class AdbInstallError(AdbError):
 
     def __str__(self):
         return self.output
+
+
+class AdbSyncError(AdbError):
+    """ sync error """
