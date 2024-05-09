@@ -5,6 +5,7 @@
 """
 
 
+import logging
 import struct
 import datetime
 import typing
@@ -17,8 +18,9 @@ from contextlib import contextmanager
 from adbutils._adb import BaseClient, AdbError
 from adbutils._proto import FileInfo
 from adbutils._utils import append_path
+from adbutils.errors import AdbSyncError
 
-
+logger = logging.getLogger(__name__)
 
 _OKAY = "OKAY"
 _FAIL = "FAIL"
@@ -80,10 +82,36 @@ class Sync():
     def list(self, path: str) -> typing.List[str]:
         return list(self.iter_directory(path))
 
-    def push(
+    def push(self, src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
+             dst: typing.Union[pathlib.Path, str],
+             mode: int = 0o755,
+             check: bool = False) -> int:
+        """
+        Push file from local:src to device:dst
+
+        Args:
+            src: source file path
+            dst: destination file path or directory path
+            mode: file mode
+            check: check if push size is correct
+        
+        Returns:
+            total file size pushed
+        """
+        if isinstance(dst, pathlib.Path):
+            dst = dst.as_posix()
+        finfo = self.stat(dst)
+        if finfo.mode & stat.S_IFDIR != 0:
+            if not isinstance(src, (pathlib.Path, str)):
+                raise AdbSyncError("src should be a file path when dst is a directory")
+            dst = append_path(dst, pathlib.Path(src).name)
+            logger.debug("dst is a directory, update dst to %s", dst)
+        return self._push_file(src, dst, mode, check)
+    
+    def _push_file(
             self,
             src: typing.Union[pathlib.Path, str, bytes, bytearray, typing.BinaryIO],
-            dst: typing.Union[pathlib.Path, str],
+            dst: str,
             mode: int = 0o755,
             check: bool = False) -> int:  # yapf: disable
         # IFREG: File Regular
@@ -98,15 +126,13 @@ class Sync():
             if not hasattr(src, "read"):
                 raise TypeError("Invalid src type: %s" % type(src))
 
-        if isinstance(dst, pathlib.Path):
-            dst = dst.as_posix()
         path = dst + "," + str(stat.S_IFREG | mode)
         total_size = 0
         with self._prepare_sync(path, "SEND") as c:
             r = src if hasattr(src, "read") else open(src, "rb")
             try:
                 while True:
-                    chunk = r.read(4096)
+                    chunk = r.read(4096) # should not >64k
                     if not chunk:
                         mtime = int(datetime.datetime.now().timestamp())
                         c.conn.send(b"DONE" + struct.pack("<I", mtime))

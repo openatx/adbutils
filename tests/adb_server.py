@@ -94,10 +94,15 @@ async def host_kill(ctx: Context):
     await ctx.server.stop()
     # os.kill(os.getpid(), signal.SIGINT)
 
+@register_command("host:list-forward")
+async def host_list_forward(ctx: Context):
+    await ctx.send(b"OKAY")
+    await ctx.send(encode_string("123456 tcp:1234 tcp:4321"))
+
+
 SHELL_OUTPUTS = {
     "pwd": "/",
 }
-
 
 @register_command(re.compile("host:tport:serial:.*"))
 async def host_tport_serial(ctx: Context):

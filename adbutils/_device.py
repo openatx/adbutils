@@ -14,6 +14,7 @@ import typing
 from typing import List, Optional, Union
 
 from PIL import Image, UnidentifiedImageError
+from deprecation import deprecated
 
 from adbutils._deprecated import DeprecatedExtension
 from adbutils.install import InstallExtension
@@ -66,9 +67,7 @@ class BaseDevice:
         self, command: str = None, timeout: float = _DEFAULT_SOCKET_TIMEOUT
     ) -> AdbConnection:
         # connect has it own timeout
-        c = self._client.make_connection()
-        if timeout:
-            c.conn.settimeout(timeout)
+        c = self._client.make_connection(timeout=timeout)
 
         if command:
             if self._transport_id:
@@ -236,17 +235,7 @@ class BaseDevice:
         return ShellReturn(command=cmdargs, returncode=returncoode, output=output)
 
     def forward(self, local: str, remote: str, norebind: bool = False):
-        c = self.open_transport()
-        args = ["host:forward"]
-        if norebind:
-            args.append("norebind")
-        args.append(local + ";" + remote)
-        c.send_command(":".join(args))
-        c.check_okay() # this OKAY means message was received
-        c.check_okay() # check reponse
-        # when successfully forwarded, port string will response, eg: "00041237"
-        # here we just read it and ignore
-        c.read_until_close()
+        self._client.forward(self._serial, local, remote, norebind)
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """forward remote port to local random port"""
@@ -264,15 +253,8 @@ class BaseDevice:
         return local_port
 
     def forward_list(self) -> List[ForwardItem]:
-        c = self.open_transport("list-forward")
-        content = c.read_string_block()
-        items = []
-        for line in content.splitlines():
-            parts = line.split()
-            if len(parts) != 3:
-                continue
-            items.append(ForwardItem(*parts))
-        return items
+        items = self._client.forward_list()
+        return [item for item in items if item.serial == self._serial]
 
     def reverse(self, remote: str, local: str, norebind: bool = False):
         """
@@ -357,8 +339,10 @@ class BaseDevice:
         image = Image.frombytes(color_format, (width, height), buffer)
         return image
 
-    def push(self, local: str, remote: str) -> str:
-        return self.adb_output("push", local, remote)
+    @deprecated(deprecated_in="2.6.0", removed_in="3.0.0", current_version=__version__, details="use sync.push instead")
+    def push(self, local: str, remote: str):
+        """ alias for sync.push """
+        return self.sync.push(local, remote)
 
     def create_connection(
         self, network: Network, address: Union[int, str]

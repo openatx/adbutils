@@ -16,6 +16,15 @@ def device_tmp_path(device: AdbDevice):
     yield tmp_path
     device.remove(tmp_path)
 
+
+@pytest.fixture
+def device_tmp_dir(device: AdbDevice):
+    tmp_path = "/data/local/tmp/adbutils-test"
+    device.shell("mkdir -p {}".format(tmp_path))
+    yield tmp_path
+    device.rmtree(tmp_path)
+
+
 @pytest.fixture
 def device_tmp_dir_path(device: AdbDevice):
     tmp_dir_path = "/sdcard/test_d"

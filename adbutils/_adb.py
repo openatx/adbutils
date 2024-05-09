@@ -11,7 +11,7 @@ import socket
 import subprocess
 import typing
 import weakref
-from typing import Iterator, Union
+from typing import Iterator, List, Union
 
 from deprecation import deprecated
 
@@ -324,11 +324,7 @@ class BaseClient(object):
         for d in set(curr).difference(orig):
             yield DeviceEvent(True, d.serial, d.status)
 
-    @deprecated(deprecated_in="0.15.0",
-                removed_in="1.0.0",
-                details="use device.forward_list instead",
-                current_version=__version__)
-    def forward_list(self, serial: Union[None, str] = None):
+    def forward_list(self, serial: Union[None, str] = None) -> List[ForwardItem]:
         with self.make_connection() as c:
             list_cmd = "host:list-forward"
             if serial:
@@ -336,18 +332,16 @@ class BaseClient(object):
             c.send_command(list_cmd)
             c.check_okay()
             content = c.read_string_block()
+            items = []
             for line in content.splitlines():
                 parts = line.split()
                 if len(parts) != 3:
                     continue
                 if serial and parts[0] != serial:
                     continue
-                yield ForwardItem(*parts)
+                items.append(ForwardItem(*parts))
+            return items
 
-    @deprecated(deprecated_in="0.15.0",
-                removed_in="1.0.0",
-                details="use Device.forward instead",
-                current_version=__version__)
     def forward(self, serial, local, remote, norebind=False):
         """
         Args:
@@ -359,7 +353,7 @@ class BaseClient(object):
             AdbError
         """
         with self.make_connection() as c:
-            cmds = ["host-serial", serial, "forward"]
+            cmds = ["host-serial", serial, "forward"] # host-prefix:forward:norebind:<local>;<remote>
             if norebind:
                 cmds.append("norebind")
             cmds.append(local + ";" + remote)
@@ -391,18 +385,20 @@ class BaseClient(object):
                 removed_in="1.0.0",
                 details="use Device.reverse_list instead",
                 current_version=__version__)
-    def reverse_list(self, serial: Union[None, str] = None):
+    def reverse_list(self, serial: str) -> List[ReverseItem]:
         with self.make_connection() as c:
             c.send_command("host:transport:" + serial)
             c.check_okay()
             c.send_command("reverse:list-forward")
             c.check_okay()
             content = c.read_string_block()
+            items = []
             for line in content.splitlines():
                 parts = line.split()
                 if len(parts) != 3:
                     continue
-                yield ReverseItem(*parts[1:])
+                items.append(ReverseItem(*parts[1:]))
+            return items
 
 
 

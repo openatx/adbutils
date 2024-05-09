@@ -10,11 +10,13 @@ import pathlib
 import re
 import time
 import filecmp
+import uuid
 
 import pytest
 
 import adbutils
 from adbutils import AdbDevice, Network, BrightnessMode
+from adbutils.errors import AdbSyncError
 
 
 def test_shell(device: AdbDevice):
@@ -185,6 +187,17 @@ def test_sync_pull_file_push(device: AdbDevice, device_tmp_path, tmp_path: pathl
     assert b"Hello Android" == data
 
 
+def test_sync_push_to_dir(device: AdbDevice, device_tmp_dir, tmp_path: pathlib.Path):
+    random_data = str(uuid.uuid4()).encode()
+    src = io.BytesIO(random_data)
+    with pytest.raises(AdbSyncError):
+        device.sync.push(src, device_tmp_dir)
+    src_path = tmp_path.joinpath("random.txt")
+    src_path.write_bytes(random_data)
+    assert device.sync.push(src_path, device_tmp_dir) == len(random_data)
+    assert random_data == device.sync.read_bytes(device_tmp_dir + "/random.txt")
+
+
 def test_screenshot(device: AdbDevice):
     im = device.screenshot()
     assert im.mode == "RGB"
@@ -284,7 +297,9 @@ def test_pull_push_dirs(
     local_src_out_dir1 = tmp_path / 'dir1'
     local_src_out_dir2 = tmp_path / 'dir2'
 
-    device.push(local_src_in_dir, device_tmp_dir_path)
+    # TODO: push src support dir
+    # device.push(local_src_in_dir, device_tmp_dir_path)
+    device.adb_output("push", str(local_src_in_dir), device_tmp_dir_path)
 
     device.sync.pull_dir(device_tmp_dir_path, local_src_out_dir1)
 
