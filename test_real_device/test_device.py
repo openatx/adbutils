@@ -83,12 +83,11 @@ def test_brightness(device: AdbDevice):
     current_mode = device.brightness_mode
     if current_mode == BrightnessMode.AUTO:
         device.brightness_mode = BrightnessMode.MANUAL
-        assert int(device.shell('settings get system screen_brightness_mode').strip()) == 0
+        assert device.brightness_mode == BrightnessMode.MANUAL
     elif current_mode == BrightnessMode.MANUAL:
         device.brightness_mode = BrightnessMode.AUTO
-        assert int(device.shell('settings get system screen_brightness_mode').strip()) == 1
+        assert device.brightness_mode == BrightnessMode.AUTO
     device.brightness_mode = current_mode
-
 
 
 def test_switch_screen(device: AdbDevice):
