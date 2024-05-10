@@ -312,7 +312,7 @@ print(d.brightness_value)  # get brightness value, return int value in 0-255
 d.brightness_value = 100  # set brightness value
 
 # you can also set brightness mode
-from adbutils._proto import BrightnessMode
+from adbutils import BrightnessMode
 print(d.brightness_mode)  # output BrightnessMode.AUTO or BrightnessMode.MANUAL
 d.brightness_mode = BrightnessMode.MANUAL  # set brightness mode is manual
 d.brightness_mode = BrightnessMode.AUTO  # set brightness mode is auto
