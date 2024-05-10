@@ -7,6 +7,7 @@
 import abc
 import io
 import logging
+import re
 from typing import Optional, Union
 from adbutils.errors import AdbError
 from adbutils.sync import Sync
@@ -71,6 +72,19 @@ class ScreenshotExtesion(AbstractDevice):
         # framebuffer() is not stable, so here still use screencap
         cmdargs = ['screencap', '-p']
         if display_id is not None:
-            cmdargs.extend(['-d', str(display_id)])
+            _id = self.__get_real_display_id(display_id)
+            cmdargs.extend(['-d', _id])
         png_bytes = self.shell(cmdargs, encoding=None)
         return Image.open(io.BytesIO(png_bytes))
+
+    def __get_real_display_id(self, display_id: int) -> str:
+        # adb shell dumpsys SurfaceFlinger --display-id
+        # Display 4619827259835644672 (HWC display 0): port=0 pnpId=GGL displayName="EMU_display_0"
+        output = self.shell("dumpsys SurfaceFlinger --display-id")
+        _RE = re.compile(r"Display (\d+) ")
+        ids = _RE.findall(output)
+        if not ids:
+            raise AdbError("No display found, debug with 'dumpsys SurfaceFlinger --display-id'")
+        if display_id >= len(ids):
+            raise AdbError("Invalid display_id", display_id)
+        return ids[display_id]
