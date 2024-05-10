@@ -76,11 +76,12 @@ class ShellExtension(AbstractShellDevice):
         return self.keyevent(224 if enable else 223)
 
     @property
-    def brightness_value(self):
+    def brightness_value(self) -> int:
         """
-        Return screen brightness values
-        :return: brightness value
-        eg: print(d.brightness_value) output：128
+        Return screen brightness value, [0, 255]
+        
+        Examples:
+            print(d.brightness_value) output：128
         """
         value = self.shell('settings get system screen_brightness')
         return int(value.strip())
@@ -96,7 +97,7 @@ class ShellExtension(AbstractShellDevice):
             raise ValueError("Brightness value must be an integer")
         if not 0 <= value <= 255:
             raise ValueError("Brightness value must be between 0 and 255")
-        self.shell(f"settings put system screen_brightness {str(value)}")
+        self.shell(f"settings put system screen_brightness {value}")
 
     @property
     def brightness_mode(self) -> BrightnessMode:
@@ -104,15 +105,19 @@ class ShellExtension(AbstractShellDevice):
         Return screen brightness mode
         :return: BrightnessMode.AUTO or BrightnessMode.MANUAL
         """
-        value = int(self.shell('settings get system screen_brightness_mode').strip())
+        value = int(self.shell('settings get system screen_brightness_mode'))
         return BrightnessMode(value)
 
     @brightness_mode.setter
     def brightness_mode(self, mode: BrightnessMode):
         """
         Set screen brightness mode
-        :param mode: BrightnessMode.AUTO or BrightnessMode.MANUAL
-        eg: d.brightness_mode = BrightnessMode.AUTO
+        
+        Args:
+            mode: BrightnessMode.AUTO or BrightnessMode.MANUAL
+
+        Example:
+            d.brightness_mode = BrightnessMode.AUTO
         """
         if isinstance(mode, BrightnessMode):
             self.shell(f"settings put system screen_brightness_mode {mode.value}")
