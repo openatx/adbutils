@@ -284,9 +284,12 @@ d.app_info("com.github.uiautomator")
 # example output: {"version_name": "1.1.7", "version_code": "1007"}
 
 d.keyevent("HOME")
+
 d.volume_up()
 d.volume_down()
-d.volume_mute()
+# default times=1, If you want to adjust the volume multiple times, you can use：d.volume_up(times=xxx)
+
+d.volume_mute()  # device mute
 
 d.send_keys("hello world$%^&*") # simulate: adb shell input text "hello%sworld\%\^\&\*"
 
@@ -302,8 +305,18 @@ d.root()
 # adb tcpip <port>
 d.tcpip(5555)
 
-print(d.battery())
+print(d.battery())  # get battery info
 BatteryInfo(ac_powered=False, usb_powered=False, wireless_powered=False, dock_powered=False, max_charging_current=0, max_charging_voltage=0, charge_counter=10000, status=4, health=2, present=True, level=100, scale=100, voltage=5000, temperature=25.0, technology='Li-ion')
+
+print(d.brightness_value)  # get brightness value, return int value in 0-255
+d.brightness_value = 100  # set brightness value
+
+# you can also set brightness mode
+from adbutils import BrightnessMode
+print(d.brightness_mode)  # output BrightnessMode.AUTO or BrightnessMode.MANUAL
+d.brightness_mode = BrightnessMode.MANUAL  # set brightness mode is manual
+d.brightness_mode = BrightnessMode.AUTO  # set brightness mode is auto
+
 ```
 
 Screenrecord (mp4)

@@ -15,7 +15,7 @@ import uuid
 import pytest
 
 import adbutils
-from adbutils import AdbDevice, Network
+from adbutils import AdbDevice, Network, BrightnessMode
 from adbutils.errors import AdbSyncError
 
 
@@ -72,6 +72,22 @@ def test_keyevent(device: AdbDevice):
     device.volume_up(2)
     device.volume_down(3)
     device.volume_mute()
+
+
+def test_brightness(device: AdbDevice):
+    current_brightness = device.brightness_value
+    device.brightness_value = 100
+    assert device.brightness_value == 100
+    device.brightness_value = current_brightness
+
+    current_mode = device.brightness_mode
+    if current_mode == BrightnessMode.AUTO:
+        device.brightness_mode = BrightnessMode.MANUAL
+        assert device.brightness_mode == BrightnessMode.MANUAL
+    elif current_mode == BrightnessMode.MANUAL:
+        device.brightness_mode = BrightnessMode.AUTO
+        assert device.brightness_mode == BrightnessMode.AUTO
+    device.brightness_mode = current_mode
 
 
 def test_switch_screen(device: AdbDevice):
@@ -238,8 +254,6 @@ def test_logcat(device: AdbDevice, tmp_path: pathlib.Path):
     logcat.stop()
     assert logcat_path.exists()
     assert re.compile(r"I/TAG.*hello").search(logcat_path.read_text(encoding="utf-8"))
-
-
 
 
 # todo: make independent of already present stuff on the phone

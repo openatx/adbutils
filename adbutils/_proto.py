@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 __all__ = [
-    "Network", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
-    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo"
+    "Network", "BrightnessMode", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
+    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo", "BatteryInfo"
 ]
 
 import enum
@@ -25,6 +25,11 @@ class Network(str, enum.Enum):
     LOCAL_RESERVED = "localreserved"
     LOCAL_FILESYSTEM = "localfilesystem"
     LOCAL_ABSTRACT = "localabstract"  # same as UNIX
+
+
+class BrightnessMode(int, enum.Enum):
+    AUTO = 1
+    MANUAL = 0
 
 
 @dataclass(frozen=True)
@@ -82,8 +87,8 @@ class BatteryInfo:
     present: Optional[bool]
     level: Optional[int]
     scale: Optional[int]
-    voltage: Optional[int] # mV
-    temperature: Optional[float] # e.g. 25.0
+    voltage: Optional[int]  # mV
+    temperature: Optional[float]  # e.g. 25.0
     technology: Optional[str]
 
 

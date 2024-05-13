@@ -10,7 +10,7 @@ import json
 import re
 import time
 from typing import List, Optional, Union
-from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo
+from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo, BrightnessMode
 from adbutils.errors import AdbError, AdbInstallError
 from adbutils._utils import escape_special_characters
 from retry import retry
@@ -74,6 +74,55 @@ class ShellExtension(AbstractShellDevice):
     def switch_screen(self, enable: bool):
         """turn screen on/off"""
         return self.keyevent(224 if enable else 223)
+
+    @property
+    def brightness_value(self) -> int:
+        """
+        Return screen brightness value, [0, 255]
+        
+        Examples:
+            print(d.brightness_value) output：128
+        """
+        value = self.shell('settings get system screen_brightness')
+        return int(value.strip())
+
+    @brightness_value.setter
+    def brightness_value(self, value: int):
+        """
+        Set screen brightness values
+        :param value: brightness value
+        eg: d.brightness_value = 128
+        """
+        if not isinstance(value, int):
+            raise ValueError("Brightness value must be an integer")
+        if not 0 <= value <= 255:
+            raise ValueError("Brightness value must be between 0 and 255")
+        self.shell(f"settings put system screen_brightness {value}")
+
+    @property
+    def brightness_mode(self) -> BrightnessMode:
+        """
+        Return screen brightness mode
+        :return: BrightnessMode.AUTO or BrightnessMode.MANUAL
+        """
+        value = int(self.shell('settings get system screen_brightness_mode'))
+        return BrightnessMode(value)
+
+    @brightness_mode.setter
+    def brightness_mode(self, mode: BrightnessMode):
+        """
+        Set screen brightness mode
+        
+        Args:
+            mode: BrightnessMode.AUTO or BrightnessMode.MANUAL
+
+        Example:
+            d.brightness_mode = BrightnessMode.AUTO
+        """
+        if isinstance(mode, BrightnessMode):
+            self.shell(f"settings put system screen_brightness_mode {mode.value}")
+        else:
+            raise ValueError("Brightness mode must be an instance of BrightnessMode")
 
     def switch_airplane(self, enable: bool):
         """turn airplane-mode on/off"""
@@ -447,7 +496,7 @@ class ShellExtension(AbstractShellDevice):
 
         Returns:
             BatteryInfo
-        
+
         Details:
             AC powered - Indicates that the device is currently not powered by AC power. If true, it indicates that the device is connected to an AC power adapter.
             USB powered - Indicates that the device is currently being powered or charged through the USB interface.
@@ -464,21 +513,22 @@ class ShellExtension(AbstractShellDevice):
             Temperature - Battery temperature, usually measured in degrees Celsius (° C)
             Technology - Battery type, like (Li-ion) battery
         """
+
         def to_bool(v: str) -> bool:
             return v == "true"
-        
+
         output = self.shell(["dumpsys", "battery"])
         shell_kvs = {}
         for line in output.splitlines():
             key, val = line.strip().split(':', 1)
             shell_kvs[key.strip()] = val.strip()
-        
+
         def get_key(k: str, map_function):
             v = shell_kvs.get(k)
             if v is not None:
                 return map_function(v)
             return None
-        
+
         ac_powered = get_key("AC powered", to_bool)
         usb_powered = get_key("USB powered", to_bool)
         wireless_powered = get_key("Wireless powered", to_bool)
