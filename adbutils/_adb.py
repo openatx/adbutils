@@ -64,7 +64,7 @@ class AdbConnection(object):
     def _safe_connect(self):
         try:
             return self._create_socket()
-        except AdbConnectionError:
+        except (AdbConnectionError, AdbTimeout):
             subprocess.run([adb_path(), "start-server"], timeout=20.0)  # 20s should enough for adb start
             return self._create_socket()
 
