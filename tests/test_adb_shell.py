@@ -38,6 +38,22 @@ def test_shell_screenshot(adb: adbutils.AdbClient):
     assert pixel[:3] == (0, 0, 0)
 
 
+def test_window_size(adb: adbutils.AdbClient):
+    d = adb.device(serial="123456")
+    
+    def mock_shell(cmd):
+        if cmd == "wm size":
+            return "Physical size: 1080x1920"
+        if cmd == "dumpsys display":
+            return "mViewports=[DisplayViewport{orientation=0]"
+        return ""
+    
+    d.shell = mock_shell
+    wsize = d.window_size()
+    assert wsize.width == 1080
+    assert wsize.height == 1920
+
+
 def test_shell_battery(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")
 
