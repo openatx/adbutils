@@ -7,6 +7,7 @@
 import abc
 import datetime
 import json
+import logging
 import re
 import time
 from typing import List, Optional, Union
@@ -16,6 +17,8 @@ from adbutils._utils import escape_special_characters
 from retry import retry
 
 from adbutils.sync import Sync
+
+logger = logging.getLogger(__name__)
 
 _DISPLAY_RE = re.compile(
     r".*DisplayViewport{.*?valid=true, .*?orientation=(?P<orientation>\d+), .*?deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*"
@@ -153,34 +156,45 @@ class ShellExtension(AbstractShellDevice):
 
     def window_size(self) -> WindowSize:
         """
-        Return screen (width, height)
+        Return screen (width, height) in pixel, width and height will be swapped if rotation is 90 or 270
 
-        Virtual keyborad may get small d.info['displayHeight']
+        Returns:
+            WindowSize
+        
+        Raises:
+            AdbError
         """
-        w, h = self._raw_window_size()
-        s, l = min(w, h), max(w, h)
-        horizontal = self.rotation() % 2 == 1
-        return WindowSize(l, s) if horizontal else WindowSize(s, l)
-
-    def _raw_window_size(self) -> WindowSize:
-        output = self.shell("wm size")
-        o = re.search(r"Override size: (\d+)x(\d+)", output)
-        m = re.search(r"Physical size: (\d+)x(\d+)", output)
-        if o:
-            w, h = o.group(1), o.group(2)
-            return WindowSize(int(w), int(h))
-        elif m:
-            w, h = m.group(1), m.group(2)
-            return WindowSize(int(w), int(h))
-
-        for line in self.shell("dumpsys display").splitlines():
+        try:
+            logger.debug("get window size from 'dumpsys display'")
+            return self._dumpsys_window_size()
+        except AdbError:
+            logger.debug("get window size from 'wm size'")
+            wsize = self._wm_size()
+            horizontal = self.rotation() % 2 == 1
+            return WindowSize(wsize.height, wsize.width) if horizontal else wsize
+    
+    def _dumpsys_window_size(self) -> WindowSize:
+        output = self.shell("dumpsys display")
+        for line in output.splitlines():
             m = _DISPLAY_RE.search(line, 0)
             if not m:
                 continue
             w = int(m.group("width"))
             h = int(m.group("height"))
             return WindowSize(w, h)
-        raise AdbError("get window size failed")
+        raise AdbError("get window size from 'dumpsys display' failed", output)
+    
+    def _wm_size(self) -> WindowSize:
+        output = self.shell("wm size")
+        o = re.search(r"Override size: (\d+)x(\d+)", output)
+        if o:
+            w, h = o.group(1), o.group(2)
+            return WindowSize(int(w), int(h))
+        m = re.search(r"Physical size: (\d+)x(\d+)", output)
+        if m:
+            w, h = m.group(1), m.group(2)
+            return WindowSize(int(w), int(h))
+        raise AdbError("wm size output unexpected", output)
 
     def swipe(self, sx, sy, ex, ey, duration: float = 1.0) -> None:
         """
@@ -254,23 +268,11 @@ class ShellExtension(AbstractShellDevice):
             int [0, 1, 2, 3]
         """
         for line in self.shell("dumpsys display").splitlines():
-            m = _DISPLAY_RE.search(line, 0)
+            m = re.search(r".*?orientation=(?P<orientation>\d+)", line)
             if not m:
                 continue
             o = int(m.group("orientation"))
             return int(o)
-
-        output = self.shell(
-            "LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/minicap -i"
-        )
-        try:
-            if output.startswith("INFO:"):
-                output = output[output.index("{"):]
-            data = json.loads(output)
-            return data["rotation"] / 90
-        except ValueError:
-            pass
-
         raise AdbError("rotation get failed")
 
     def remove(self, path: str):

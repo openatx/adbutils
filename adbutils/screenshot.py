@@ -7,7 +7,9 @@
 import abc
 import io
 import logging
+import re
 from typing import Optional, Union
+from adbutils.errors import AdbError
 from adbutils.sync import Sync
 from adbutils._proto import WindowSize
 from PIL import Image
@@ -39,16 +41,17 @@ class AbstractDevice(abc.ABC):
         pass
 
 class ScreenshotExtesion(AbstractDevice):
-    def __init__(self):
-        self.__framebuffer_ok = True
-
-    def screenshot(self, display_id: Optional[int] = None) -> Image.Image:
+    def screenshot(self, display_id: Optional[int] = None, error_ok: bool = True) -> Image.Image:
         """ Take a screenshot and return PIL.Image.Image object
         Args:
             display_id: int, default None, see "dumpsys SurfaceFlinger --display-id" for valid display IDs
+            error_ok: bool, default True, if True, return a black image when capture failed
         
         Returns:
-            PIL.Image.Image object, If capture failed, return a black image
+            PIL.Image.Image object
+        
+        Raises:
+            AdbError: when capture failed and error_ok is False
         """
         try:
             pil_image = self.__screencap(display_id)
@@ -56,24 +59,32 @@ class ScreenshotExtesion(AbstractDevice):
                 pil_image = pil_image.convert("RGB")
             return pil_image
         except UnidentifiedImageError as e:
-            wsize = self.window_size()
-            return Image.new("RGB", wsize, (0, 0, 0))
+            logger.warning("screencap error: %s", e)
+            if error_ok:
+                wsize = self.window_size()
+                return Image.new("RGB", wsize, (0, 0, 0))
+            else:
+                raise AdbError("screencap error") from e
     
     def __screencap(self, display_id: int = None) -> Image.Image:
         """ Take a screenshot and return PIL.Image.Image object
         """
-        # framebuffer is not stable, so we disable it
-        # MemoryError may occur when using framebuffer
-        
-        # if self.__framebuffer_ok and display_id is None:
-        #     try:
-        #         return self.framebuffer()
-        #     except NotImplementedError:
-        #         self.__framebuffer_ok = False
-        #     except UnidentifiedImageError as e:
-        #         logger.warning("framebuffer error: %s", e)
+        # framebuffer() is not stable, so here still use screencap
         cmdargs = ['screencap', '-p']
         if display_id is not None:
-            cmdargs.extend(['-d', str(display_id)])
+            _id = self.__get_real_display_id(display_id)
+            cmdargs.extend(['-d', _id])
         png_bytes = self.shell(cmdargs, encoding=None)
         return Image.open(io.BytesIO(png_bytes))
+
+    def __get_real_display_id(self, display_id: int) -> str:
+        # adb shell dumpsys SurfaceFlinger --display-id
+        # Display 4619827259835644672 (HWC display 0): port=0 pnpId=GGL displayName="EMU_display_0"
+        output = self.shell("dumpsys SurfaceFlinger --display-id")
+        _RE = re.compile(r"Display (\d+) ")
+        ids = _RE.findall(output)
+        if not ids:
+            raise AdbError("No display found, debug with 'dumpsys SurfaceFlinger --display-id'")
+        if display_id >= len(ids):
+            raise AdbError("Invalid display_id", display_id)
+        return ids[display_id]

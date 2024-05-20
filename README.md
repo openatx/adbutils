@@ -203,6 +203,11 @@ Take screenshot
 ```python
 # Method 1 (Recommend)
 pil_image = d.screenshot()
+# default display_id=0, error_ok=True
+try:
+    pil_image = d.screenshot(display_id=1, error_ok=False)
+except AdbError:
+    print("failed to takeScreenshot")
 
 # Method 2
 # adb exec-out screencap -p p.png

@@ -4,12 +4,54 @@
 """Created on Mon May 06 2024 14:41:10 by codeskyblue
 """
 
+from unittest import mock
+import pytest
 import adbutils
+from adbutils.errors import AdbError
 
 
 def test_shell_pwd(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")
     assert d.shell("pwd") == "/"
+
+
+def test_shell_screenshot(adb: adbutils.AdbClient):
+    d = adb.device(serial="123456")
+    
+    def mock_shell(cmd: str, encoding='utf-8', **kwargs):
+        if encoding is None:
+            return b""
+        if cmd == "wm size":
+            return "Physical size: 1080x1920"
+        return b""
+
+    d.shell = mock_shell
+    d.rotation = lambda: 0
+
+    with pytest.raises(AdbError):
+        d.screenshot(error_ok=False)
+    pil_img = d.screenshot(error_ok=True)
+    assert pil_img.size == (1080, 1920)
+    
+    # assert pixel is blank
+    pixel = pil_img.getpixel((0, 0))
+    assert pixel[:3] == (0, 0, 0)
+
+
+def test_window_size(adb: adbutils.AdbClient):
+    d = adb.device(serial="123456")
+    
+    def mock_shell(cmd):
+        if cmd == "wm size":
+            return "Physical size: 1080x1920"
+        if cmd == "dumpsys display":
+            return "mViewports=[DisplayViewport{orientation=0]"
+        return ""
+    
+    d.shell = mock_shell
+    wsize = d.window_size()
+    assert wsize.width == 1080
+    assert wsize.height == 1920
 
 
 def test_shell_battery(adb: adbutils.AdbClient):
