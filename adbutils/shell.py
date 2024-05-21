@@ -164,25 +164,22 @@ class ShellExtension(AbstractShellDevice):
         Raises:
             AdbError
         """
-        try:
-            logger.debug("get window size from 'dumpsys display'")
-            return self._dumpsys_window_size()
-        except AdbError:
-            logger.debug("get window size from 'wm size'")
-            wsize = self._wm_size()
-            horizontal = self.rotation() % 2 == 1
-            return WindowSize(wsize.height, wsize.width) if horizontal else wsize
+        wsize = self._wm_size()
+        horizontal = self.rotation() % 2 == 1
+        logger.debug("get window size from 'wm size'", wsize, horizontal)
+        return WindowSize(wsize.height, wsize.width) if horizontal else wsize
     
-    def _dumpsys_window_size(self) -> WindowSize:
-        output = self.shell("dumpsys display")
-        for line in output.splitlines():
-            m = _DISPLAY_RE.search(line, 0)
-            if not m:
-                continue
-            w = int(m.group("width"))
-            h = int(m.group("height"))
-            return WindowSize(w, h)
-        raise AdbError("get window size from 'dumpsys display' failed", output)
+    # the ", deviceHeight=xxx}]" is not correct
+    # def _dumpsys_window_size(self) -> WindowSize:
+    #     output = self.shell("dumpsys display")
+    #     for line in output.splitlines():
+    #         m = _DISPLAY_RE.search(line, 0)
+    #         if not m:
+    #             continue
+    #         w = int(m.group("width"))
+    #         h = int(m.group("height"))
+    #         return WindowSize(w, h)
+    #     raise AdbError("get window size from 'dumpsys display' failed", output)
     
     def _wm_size(self) -> WindowSize:
         output = self.shell("wm size")
