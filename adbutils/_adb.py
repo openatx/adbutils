@@ -64,12 +64,13 @@ class AdbConnection(object):
     def _safe_connect(self):
         try:
             return self._create_socket()
-        except Exception as e:
-            flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-            err_msg = f'{type(e).__name__}: {str(e)}'
-            print(f"{err_msg}.\nusing command '{adb_path()} start-server'...")
-            subprocess.run([adb_path(), "start-server"], timeout=20.0, creationflags=flags)  # 20s should enough for adb start
-            return self._create_socket()
+        except AdbTimeout:
+            pass
+        except AdbConnectionError:
+            pass
+        flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        subprocess.run([adb_path(), "start-server"], timeout=20.0, creationflags=flags)  # 20s should enough for adb start
+        return self._create_socket()
 
     @property
     def closed(self) -> bool:
