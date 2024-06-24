@@ -95,6 +95,9 @@ def main():
                         "--list",
                         action="store_true",
                         help="list devices")
+    parser.add_argument("--list-extended",
+                        action="store_true",
+                        help="list devices with props (overrides --list)")
     parser.add_argument("-i",
                         "--install",
                         help="install from local apk or url")
@@ -147,6 +150,18 @@ def main():
 
     if args.server_version:
         print("ADB Server version: {}".format(adbclient.server_version()))
+        return
+
+    if args.list_extended:
+        rows = []
+        for info in adbclient.list(extended=True):
+            rows.append([info.serial, " ".join([k+":"+v for (k,v) in info.tags.items()])])
+        lens = []
+        for col in zip(*rows):
+            lens.append(max([len(v) for v in col]))
+        format = "  ".join(["{:<" + str(l) + "}" for l in lens])
+        for row in rows:
+            print(format.format(*row))
         return
 
     if args.list:
