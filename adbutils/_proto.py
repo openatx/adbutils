@@ -13,7 +13,7 @@ import enum
 import datetime
 import pathlib
 from typing import List, NamedTuple, Optional, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class Network(str, enum.Enum):
@@ -121,6 +121,7 @@ class ShellReturn:
 class AdbDeviceInfo:
     serial: str
     state: str
+    tags: dict[str] = field(default_factory={})
 
 
 StrOrPathLike = Union[str, pathlib.Path]
