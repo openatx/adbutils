@@ -40,18 +40,23 @@ class AdbClient(_BaseClient):
         """
         infos = []
         with self.make_connection() as c:
-            ext, sep = ("-l", None) if extended else ("", "\t")
-            c.send_command("host:devices" + ext)
+            if extended:
+                c.send_command("host:devices-l")
+            else:
+                c.send_command("host:devices")
             c.check_okay()
             output = c.read_string_block()
             for line in output.splitlines():
-                parts = line.strip().split(sep)
-                if not extended and len(parts) != 2:
-                    continue
+                parts = line.split()
                 tags = {}
-                if len(parts) > 2:
+                if extended:
+                    if len(parts) <= 2:
+                        continue
                     tags['device_version'] = parts[2]
-                tags = {**tags, **{kv[0]: kv[1] for kv in list(map(lambda tag: tag.split(":"), parts[3:]))}}
+                    tags = {**tags, **{kv[0]: kv[1] for kv in list(map(lambda tag: tag.split(":"), parts[3:]))}}
+                else:
+                    if len(parts) != 2:
+                        continue
                 infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1], tags=tags))
         return infos
 
