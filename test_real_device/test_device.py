@@ -217,6 +217,10 @@ def test_window_size(device: AdbDevice):
     w, h = device.window_size()
     assert isinstance(w, int)
     assert isinstance(h, int)
+    
+    is_landscape = device.rotation() % 2 == 1
+    nw, nh = device.window_size(not is_landscape)
+    assert w == nh and h == nw
 
 
 def test_is_screen_on(device: AdbDevice):
