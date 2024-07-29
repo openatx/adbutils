@@ -100,6 +100,35 @@ async def host_list_forward(ctx: Context):
     await ctx.send(encode_string("123456 tcp:1234 tcp:4321"))
 
 
+def enable_devices():
+    @register_command("host:devices")
+    async def host_devices(ctx: Context):
+        await ctx.send(b"OKAY")
+        await ctx.send(encode_string("dummydevice\tdevice\n"))
+
+    @register_command("host:devices-l")
+    async def host_devices_extended(ctx: Context):
+        await ctx.send(b"OKAY")
+        await ctx.send(encode_string("dummydevice\tdevice product:test_emu model:test_model device:test_device\n"))
+        
+
+def invalidate_devices():
+    @register_command("host:devices")
+    async def host_devices(ctx: Context):
+        await ctx.send(b"OKAY")
+        await ctx.send(encode_string("dummydevice"))
+        
+    @register_command("host:devices-l")
+    async def host_devices_extended(ctx: Context):
+        """"""
+        await ctx.send(b"OKAY")
+        await ctx.send(encode_string("dummydevice"))
+
+SHELL_DEBUGS = {
+    "enable-devices": enable_devices,
+    "invalidate-devices": invalidate_devices
+}
+
 SHELL_OUTPUTS = {
     "pwd": "/",
 }
@@ -123,10 +152,12 @@ async def host_tport_serial(ctx: Context):
     shell_cmd = cmd.split(":", 1)[1]
     if shell_cmd in SHELL_OUTPUTS:
         await ctx.send((SHELL_OUTPUTS[shell_cmd].rstrip() + "\n").encode())
+    elif shell_cmd in SHELL_DEBUGS:
+        SHELL_DEBUGS[shell_cmd]()
+        await ctx.send(b"debug command executed")
     else:
         await ctx.send(b"unknown command")
     
-
 
 async def handle_command(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer"):
     try:

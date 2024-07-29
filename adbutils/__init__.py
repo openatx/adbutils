@@ -49,14 +49,11 @@ class AdbClient(_BaseClient):
             for line in output.splitlines():
                 parts = line.split()
                 tags = {}
+                num_required_fields = 2 # serial and state
+                if len(parts) < num_required_fields:
+                    continue
                 if extended:
-                    if len(parts) <= 2:
-                        continue
-                    tags['device_version'] = parts[2]
-                    tags = {**tags, **{kv[0]: kv[1] for kv in list(map(lambda tag: tag.split(":"), parts[3:]))}}
-                else:
-                    if len(parts) != 2:
-                        continue
+                    tags = {**tags, **{kv[0]: kv[1] for kv in list(map(lambda pair: pair.split(":"), parts[num_required_fields:]))}}
                 infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1], tags=tags))
         return infos
 
