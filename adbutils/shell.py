@@ -281,13 +281,26 @@ class ShellExtension(AbstractShellDevice):
             url = "https://" + url
         self.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", url])
 
-    def list_packages(self) -> List[str]:
+    def list_packages(self, filter_list: Optional[List[str]] = None) -> List[str]:
         """
+        Args:
+            filter_list (List[str]): package filter
+                -f: See associated file.
+                -d: Filter to only show disabled packages.
+                -e: Filter to only show enabled packages.
+                -s: Filter to only show system packages.
+                -3: Filter to only show third-party packages.
+                -i: See the installer for the packages.
+                -u: Include uninstalled packages.
+                --user user_id: The user space to query.
         Returns:
             list of package names
         """
         result = []
-        output = self.shell(["pm", "list", "packages"])
+        cmd = ["pm", "list", "packages"]
+        if filter_list:
+            cmd.extend(filter_list)
+        output = self.shell(cmd)
         for m in re.finditer(r"^package:([^\s]+)\r?$", output, re.M):
             result.append(m.group(1))
         return list(sorted(result))
