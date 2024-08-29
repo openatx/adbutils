@@ -27,7 +27,3 @@ def test_host_tport_serial(adb: adbutils.AdbClient):
 
     d = adb.device(serial="123456")
     d.open_transport()
-
-
-
-
