@@ -279,11 +279,14 @@ d.list_packages()
 # example output: ["com.example.hello"]
 
 d.window_size()
-# example output: (1080, 1920)
+# example output: (1080, 1920) when phone is portrait
+# example output: (1920, 1080) when phone is landscape
+d.window_size(landscape=True) # force landscape mode
+# example output: (1920, 1080)
 
-d.rotation()
-# example output: 1
-# other possible valus: 0, 1, 2, 3
+d.rotation() -> int
+# example output: 0
+# 0: natural, 1: left, 2: right, 3: upsidedown
 
 d.app_info("com.github.uiautomator")
 # example output: {"version_name": "1.1.7", "version_code": "1007"}

@@ -154,10 +154,13 @@ class ShellExtension(AbstractShellDevice):
         cmdargs = ["svc", "wifi", arglast]
         self.shell(cmdargs)
 
-    def window_size(self) -> WindowSize:
+    def window_size(self, landscape: Optional[bool] = None) -> WindowSize:
         """
         Return screen (width, height) in pixel, width and height will be swapped if rotation is 90 or 270
 
+        Args:
+            landscape: bool, default None, if True, return (width, height), else return (height, width)
+            
         Returns:
             WindowSize
         
@@ -165,21 +168,10 @@ class ShellExtension(AbstractShellDevice):
             AdbError
         """
         wsize = self._wm_size()
-        horizontal = self.rotation() % 2 == 1
-        logger.debug("get window size from 'wm size'", wsize, horizontal)
-        return WindowSize(wsize.height, wsize.width) if horizontal else wsize
-    
-    # the ", deviceHeight=xxx}]" is not correct
-    # def _dumpsys_window_size(self) -> WindowSize:
-    #     output = self.shell("dumpsys display")
-    #     for line in output.splitlines():
-    #         m = _DISPLAY_RE.search(line, 0)
-    #         if not m:
-    #             continue
-    #         w = int(m.group("width"))
-    #         h = int(m.group("height"))
-    #         return WindowSize(w, h)
-    #     raise AdbError("get window size from 'dumpsys display' failed", output)
+        if landscape is None:
+            landscape = self.rotation() % 2 == 1
+        logger.debug("get window size from 'wm size'", wsize, landscape)
+        return WindowSize(wsize.height, wsize.width) if landscape else wsize
     
     def _wm_size(self) -> WindowSize:
         output = self.shell("wm size")
