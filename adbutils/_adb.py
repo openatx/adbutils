@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import socket
 import subprocess
 import typing
@@ -50,6 +51,13 @@ class AdbConnection(object):
         adb_host = self.__host
         adb_port = self.__port
         s = socket.socket()
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) # Set TCP keepalive
+        if platform.system() == "Darwin":
+            pass
+        else:
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
         try:
             s.settimeout(3) # prevent socket hang
             s.connect((adb_host, adb_port))
