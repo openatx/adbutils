@@ -170,7 +170,7 @@ class ShellExtension(AbstractShellDevice):
         wsize = self._wm_size()
         if landscape is None:
             landscape = self.rotation() % 2 == 1
-        logger.debug("get window size from 'wm size'", wsize, landscape)
+        logger.debug("get window size from 'wm size': %s %s", wsize, landscape)
         return WindowSize(wsize.height, wsize.width) if landscape else wsize
     
     def _wm_size(self) -> WindowSize:
