@@ -295,7 +295,7 @@ class BaseClient(object):
             if raise_error:
                 raise
 
-    def track_devices(self) -> Iterator[DeviceEvent]:
+    def track_devices(self, limit_status: typing.List[str] | None = None) -> Iterator[DeviceEvent]:
         """
         Report device state when changes
 
@@ -309,6 +309,7 @@ class BaseClient(object):
             AdbError when adb-server was killed
         """
         orig_devices = []
+        limit_status = limit_status or []
 
         with self.make_connection() as c:
             c.send_command("host:track-devices")
@@ -317,7 +318,8 @@ class BaseClient(object):
                 output = c.read_string_block()
                 curr_devices = self._output2devices(output)
                 for event in self._diff_devices(orig_devices, curr_devices):
-                    yield event
+                    if event.status in limit_status:
+                        yield event
                 orig_devices = curr_devices
 
     def _output2devices(self, output: str):
