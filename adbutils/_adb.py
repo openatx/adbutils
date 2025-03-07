@@ -45,7 +45,11 @@ class AdbConnection(object):
         self.__port = port
         self.__conn = self._safe_connect()
 
-        self._finalizer = weakref.finalize(self, self.conn.close)
+        def _close_conn():
+            self.conn.shutdown(socket.SHUT_RDWR)
+            self.conn.close()
+
+        self._finalizer = weakref.finalize(self, _close_conn)
 
     def _create_socket(self):
         adb_host = self.__host
