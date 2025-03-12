@@ -46,8 +46,11 @@ class AdbConnection(object):
         self.__conn = self._safe_connect()
 
         def _close_conn():
-            self.conn.shutdown(socket.SHUT_RDWR)
-            self.conn.close()
+            try:
+                self.__conn.shutdown(socket.SHUT_RDWR) # send FIN
+            except OSError:
+                pass
+            self.__conn.close()
 
         self._finalizer = weakref.finalize(self, _close_conn)
 
