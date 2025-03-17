@@ -194,6 +194,8 @@ class BaseDevice:
         if stream:
             return c
         output = c.read_until_close(encoding=encoding)
+        # https://github.com/openatx/uiautomator2/issues/998
+        c.close()
         if encoding:
             return output.rstrip() if rstrip else output
         return output
