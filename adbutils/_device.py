@@ -38,7 +38,7 @@ class BaseDevice:
     """Basic operation for a device"""
 
     def __init__(
-        self, client: BaseClient, serial: str = None, transport_id: int = None
+        self, client: BaseClient, serial: Optional[str] = None, transport_id: Optional[int] = None
     ):
         """
         Args:
@@ -48,7 +48,7 @@ class BaseDevice:
         """
         self._client = client
         self._serial = serial
-        self._transport_id: int = transport_id
+        self._transport_id = transport_id
         self._properties = {}  # store properties data
 
         if not serial and not transport_id:
@@ -60,11 +60,11 @@ class BaseDevice:
         """rewrite in sub class"""
 
     @property
-    def serial(self) -> str:
+    def serial(self) -> Optional[str]:
         return self._serial
 
     def open_transport(
-        self, command: str = None, timeout: float = _DEFAULT_SOCKET_TIMEOUT
+        self, command: Optional[str] = None, timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT
     ) -> AdbConnection:
         # connect has it own timeout
         c = self._client.make_connection(timeout=timeout)
@@ -93,8 +93,8 @@ class BaseDevice:
         return c
 
     def _get_with_command(self, cmd: str) -> str:
-        c = self.open_transport(cmd)
-        return c.read_string_block()
+        with self.open_transport(cmd) as c:
+            return c.read_string_block()
 
     def get_state(self) -> str:
         """return device state {offline,bootloader,device}"""
@@ -272,25 +272,25 @@ class BaseDevice:
         Raises:
             AdbError
         """
-        c = self.open_transport()
-        args = ["reverse:forward"]
-        if norebind:
-            args.append("norebind")
-        args.append(remote + ";" + local)
-        c.send_command(":".join(args))
-        c.check_okay() # this OKAY means message was received
-        c.check_okay() # check reponse
+        with self.open_transport() as c:
+            args = ["reverse:forward"]
+            if norebind:
+                args.append("norebind")
+            args.append(remote + ";" + local)
+            c.send_command(":".join(args))
+            c.check_okay() # this OKAY means message was received
+            c.check_okay() # check reponse
 
     def reverse_list(self) -> List[ReverseItem]:
-        c = self.open_transport()
-        c.send_command("reverse:list-forward")
-        c.check_okay()
-        content = c.read_string_block()
-        items = []
-        for line in content.splitlines():
-            parts = line.split()
-            if len(parts) != 3:
-                continue
+        with self.open_transport() as c:
+            c.send_command("reverse:list-forward")
+            c.check_okay()
+            content = c.read_string_block()
+            items = []
+            for line in content.splitlines():
+                parts = line.split()
+                if len(parts) != 3:
+                    continue
             items.append(ReverseItem(*parts[1:]))
         return items
     
@@ -373,7 +373,7 @@ class BaseDevice:
             Network.DEV,
             Network.LOCAL_RESERVED,
         ]:
-            c.send_command(network + ":" + address)
+            c.send_command(network + ":" + str(address))
             c.check_okay()
         else:
             raise ValueError("Unsupported network type", network)
@@ -387,10 +387,10 @@ class BaseDevice:
             cannot run as root in production builds
         """
         # Ref: https://github.com/Swind/pure-python-adb/blob/master/ppadb/command/transport/__init__.py#L179
-        c = self.open_transport()
-        c.send_command("root:")
-        c.check_okay()
-        return c.read_until_close()
+        with self.open_transport() as c:
+            c.send_command("root:")
+            c.check_okay()
+            return c.read_until_close()
 
     def tcpip(self, port: int):
         """restart adbd listening on TCP on PORT
@@ -398,10 +398,10 @@ class BaseDevice:
         Return example:
             restarting in TCP mode port: 5555
         """
-        c = self.open_transport()
-        c.send_command("tcpip:" + str(port))
-        c.check_okay()
-        return c.read_until_close()
+        with self.open_transport() as c:
+            c.send_command("tcpip:" + str(port))
+            c.check_okay()
+            return c.read_until_close()
 
     def logcat(
         self,
@@ -505,7 +505,7 @@ class AdbDevice(
     """provide custom functions for some complex operations"""
 
     def __init__(
-        self, client: BaseClient, serial: str = None, transport_id: int = None
+        self, client: BaseClient, serial: Optional[str] = None, transport_id: Optional[int] = None
     ):
         BaseDevice.__init__(self, client, serial, transport_id)
         ScreenrecordExtension.__init__(self)

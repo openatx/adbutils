@@ -11,8 +11,7 @@ import platform
 import socket
 import subprocess
 import typing
-import weakref
-from typing import Iterator, List, Union
+from typing import Iterator, List, Optional, Union
 
 from deprecation import deprecated
 
@@ -45,16 +44,8 @@ class AdbConnection(object):
         self.__port = port
         self.__conn = self._safe_connect()
 
-        def _close_conn():
-            try:
-                self.__conn.shutdown(socket.SHUT_RDWR) # send FIN
-            except OSError:
-                pass
-            self.__conn.close()
-
-        self._finalizer = weakref.finalize(self, _close_conn)
-
     def _create_socket(self):
+        print("Connect")
         adb_host = self.__host
         adb_port = self.__port
         s = socket.socket()
@@ -75,7 +66,6 @@ class AdbConnection(object):
         except socket.error as e:
             raise AdbConnectionError("connect to adb server failed: %s" % e)
 
-
     def _safe_connect(self):
         try:
             return self._create_socket()
@@ -89,10 +79,20 @@ class AdbConnection(object):
 
     @property
     def closed(self) -> bool:
-        return not self._finalizer.alive
+        return self.__conn is None
+
+    def __del__(self):
+        self.close()
 
     def close(self):
-        self._finalizer()
+        if self.__conn is None:
+            return
+        try:
+            self.__conn.shutdown(socket.SHUT_RDWR) # send FIN
+        except OSError:
+            pass
+        self.__conn.close()
+        self.__conn = None
 
     def __enter__(self):
         return self
@@ -102,6 +102,8 @@ class AdbConnection(object):
 
     @property
     def conn(self) -> socket.socket:
+        if self.__conn is None:
+            raise AdbError("Connection is closed")
         return self.__conn
     
     def send(self, data: bytes) -> int:
@@ -192,7 +194,7 @@ class BaseClient(object):
     def port(self) -> int:
         return self.__port
         
-    def make_connection(self, timeout: float = None) -> AdbConnection:
+    def make_connection(self, timeout: Optional[float] = None) -> AdbConnection:
         """ connect to adb server
         
         Raises:
