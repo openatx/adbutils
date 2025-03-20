@@ -45,7 +45,6 @@ class AdbConnection(object):
         self.__conn = self._safe_connect()
 
     def _create_socket(self):
-        print("Connect")
         adb_host = self.__host
         adb_port = self.__port
         s = socket.socket()
