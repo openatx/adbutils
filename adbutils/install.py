@@ -7,11 +7,12 @@
 import abc
 import os
 import re
+import subprocess
 import time
 import typing
 
 import requests
-import apkutils2
+from typing import Optional
 from retry import retry
 from adbutils.errors import AdbInstallError
 from adbutils.sync import Sync
@@ -29,7 +30,7 @@ class AbstractDevice(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def app_start(self, package_name: str, activity: str):
+    def app_start(self, package_name: str, activity: Optional[str] = None):
         pass
 
     @abc.abstractmethod
@@ -86,6 +87,11 @@ class InstallExtension(AbstractDevice):
         self.sync.push(r, dst)
 
         # parse apk package-name
+        try:
+            import apkutils2
+        except ImportError:
+            subprocess.check_call(["pip", "install", "apkutils2"])
+            import apkutils2
         apk = apkutils2.APK(r.filepath())
         package_name = apk.manifest.package_name
         main_activity = apk.manifest.main_activity

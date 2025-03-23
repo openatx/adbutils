@@ -15,8 +15,6 @@ import typing
 import pathlib
 
 from shutil import which
-from apkutils2.axml.axmlparser import AXML
-from apkutils2.manifest import Manifest
 
 from adbutils.errors import AdbError
 
@@ -208,6 +206,11 @@ class APKReader:
         self._fp = fp
     
     def dump_info(self):
+        try:
+            from apkutils2.axml.axmlparser import AXML
+            from apkutils2.manifest import Manifest
+        except ImportError:
+            sys.exit("apkutils2 is not installed, please install it first")
         zf = zipfile.ZipFile(self._fp)
         raw_manifest = zf.read("AndroidManifest.xml")
         axml = AXML(raw_manifest)
