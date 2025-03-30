@@ -5,19 +5,24 @@
 """
 
 import abc
+import logging
 import os
+from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
 import typing
 
 import requests
-from typing import Optional
+import apkutils
+from typing import Optional, Union
 from retry import retry
 from adbutils.errors import AdbInstallError
 from adbutils.sync import Sync
 from adbutils._utils import humanize, ReadProgress
 
+logger = logging.getLogger(__name__)
 
 class AbstractDevice(abc.ABC):
     @abc.abstractmethod
@@ -43,9 +48,34 @@ class AbstractDevice(abc.ABC):
 
 
 class InstallExtension(AbstractDevice):
-    @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
+    @staticmethod
+    def download_apk(url: str, path: Path):
+        """
+        Download apk file from url
+    
+        Args:
+            url (str): The URL of the APK file to download.
+            path (Path): The local file path where the APK will be saved.
+    
+        Raises:
+            requests.exceptions.RequestException: If the download fails.
+        """
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()  # Raise an error for HTTP errors
+    
+            # Write the content to the specified path
+            with open(path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=10240):
+                    if chunk:  # Filter out keep-alive chunks
+                        file.write(chunk)
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Failed to download APK from {url}: {e}")
+            raise
+        
+    # @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
     def install(self,
-                path_or_url: str,
+                path_or_url: Union[str, Path],
                 nolaunch: bool = False,
                 uninstall: bool = False,
                 silent: bool = False,
@@ -65,71 +95,56 @@ class InstallExtension(AbstractDevice):
         Raises:
             AdbInstallError, BrokenPipeError
         """
-        if re.match(r"^https?://", path_or_url):
-            resp = requests.get(path_or_url, stream=True)
-            resp.raise_for_status()
-            length = int(resp.headers.get("Content-Length", 0))
-            r = ReadProgress(resp.raw, length)
-            print("tmpfile path:", r.filepath())
-        else:
-            length = os.stat(path_or_url).st_size
-            fd = open(path_or_url, "rb")
-            r = ReadProgress(fd, length, source_path=path_or_url)
-
-        def _dprint(*args):
+        def dprint(msg):
             if not silent:
-                print(*args)
+                print(msg)
+                
+        if isinstance(path_or_url, str) and re.match(r"^https?://", path_or_url):
+            tmpfile = tempfile.NamedTemporaryFile(suffix=".apk")
+            self.download_apk(path_or_url, Path(tmpfile.name))
+            tmpfile.flush()
+            tmpfile.seek(0)
+            src_path = Path(tmpfile.name)
+            dprint(f"download apk to {src_path}")
+        else:
+            src_path = Path(path_or_url)
+        if not src_path.is_file():
+            raise FileNotFoundError(f"File or URL not found: {path_or_url}")
+        
+        with apkutils.APK.from_file(str(src_path)) as apk:
+            activities = apk.get_main_activities()
+            main_activity = activities[0] if activities else None
+            package_name = apk.get_package_name()
+            if main_activity and main_activity.find(".") == -1:
+                main_activity = "." + main_activity
+            
+        dprint(f"APK packageName: {package_name}")
+        dprint(f"APK mainActivity: {main_activity}")
 
-        dst = "/data/local/tmp/tmp-%d.apk" % (int(time.time() * 1000))
-        _dprint("push to %s" % dst)
+        device_dst = f"/data/local/tmp/{package_name}.apk"
+        dprint(f'push apk to device: {device_dst}')
+        self._push_apk(src_path, device_dst, show_progress=not silent)
 
-        start = time.time()
-        self.sync.push(r, dst)
-
-        # parse apk package-name
-        try:
-            import apkutils2
-        except ImportError:
-            subprocess.check_call(["pip", "install", "apkutils2"])
-            import apkutils2
-        apk = apkutils2.APK(r.filepath())
-        package_name = apk.manifest.package_name
-        main_activity = apk.manifest.main_activity
-        if main_activity and main_activity.find(".") == -1:
-            main_activity = "." + main_activity
-
-        version_code = apk.manifest.version_code
-        _dprint("packageName:", package_name)
-        _dprint("mainActivity:", main_activity)
-        _dprint("apkVersion: {}".format(apk.manifest.version_name))
-        _dprint("Success pushed, time used %d seconds" % (time.time() - start))
-
-        new_dst = "/data/local/tmp/{}-{}.apk".format(package_name,
-                                                     version_code)
-        _dprint("Rename to {}".format(new_dst))
-        self.shell(["mv", dst, new_dst])
-
-        dst = new_dst
-        info = self.sync.stat(dst)
-        print("verify pushed apk, md5: %s, size: %s" %
-              (r._hash, humanize(info.size)))
-        assert info.size == r.copied
-
+        info = self.sync.stat(device_dst)
+        apk_size = src_path.stat().st_size
+        if not info.size == apk_size:
+            AdbInstallError(f'pushed apk size not matched, expect {apk_size} got {info.size}')
+        
         if uninstall:
-            _dprint("Uninstall app first")
+            dprint(f"uninstall app: {package_name}")
             self.uninstall(package_name)
 
-        _dprint("install to android system ...")
+        dprint("install to android system ...")
         try:
             start = time.time()
             if callback:
                 callback("BEFORE_INSTALL")
 
-            self.install_remote(dst, clean=True, flags=flags)
-            _dprint("Success installed, time used %d seconds" %
-                    (time.time() - start))
+            self.install_remote(device_dst, clean=True, flags=flags)
+            time_used = time.time() - start
+            dprint(f"successfully installed, time used {time_used:.1f} seconds")
             if not nolaunch:
-                _dprint("Launch app: %s/%s" % (package_name, main_activity))
+                dprint("launch app: %s/%s" % (package_name, main_activity))
                 self.app_start(package_name, main_activity)
 
         except AdbInstallError as e:
@@ -138,31 +153,41 @@ class InstallExtension(AbstractDevice):
                 "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
                 "INSTALL_FAILED_VERSION_DOWNGRADE"
             ]:
-                _dprint("uninstall %s because %s" % (package_name, e.reason))
+                dprint("uninstall %s because %s" % (package_name, e.reason))
                 self.uninstall(package_name)
-                self.install_remote(dst, clean=True, flags=flags)
-                _dprint("Success installed, time used %d seconds" %
-                        (time.time() - start))
+                self.install_remote(device_dst, clean=True, flags=flags)
+                dprint(f"successfully installed, time used {time.time() - start} seconds")
                 if not nolaunch:
-                    _dprint("Launch app: %s/%s" %
-                            (package_name, main_activity))
+                    dprint(f"Launch app: {package_name}/{main_activity}")
                     self.app_start(package_name, main_activity)
-                    # self.shell([
-                    #     'am', 'start', '-n', package_name + "/" + main_activity
-                    # ])
-            elif e.reason == "INSTALL_FAILED_CANCELLED_BY_USER":
-                _dprint("Catch error %s, reinstall" % e.reason)
-                self.install_remote(dst, clean=True, flags=flags)
-                _dprint("Success installed, time used %d seconds" %
-                        (time.time() - start))
             else:
                 # print to console
                 print(
                     "Failure " + e.reason + "\n" +
                     "Remote apk is not removed. Manually install command:\n\t"
-                    + "adb shell pm install -r -t " + dst)
+                    + "adb shell pm install -r -t " + device_dst)
                 raise
         finally:
             if callback:
                 callback("FINALLY")
 
+    def _push_apk(self, apk_path: Path, device_dst: str, show_progress: bool = True):
+        """
+        Push APK file to device with progress indication.
+    
+        Args:
+            apk_path (Path): Path to the APK file.
+            device_dst (str): Destination path on the device.
+    
+        Returns:
+            None
+        """
+        start = time.time()
+        length = apk_path.stat().st_size
+        with apk_path.open("rb") as fd:
+            if show_progress:
+                r = ReadProgress(fd, length, source_path=str(apk_path))
+                self.sync.push(r, device_dst)
+            else:
+                self.sync.push(fd, device_dst)
+        logger.info("Success pushed, time used %d seconds" % (time.time() - start))

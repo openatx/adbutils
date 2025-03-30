@@ -184,8 +184,9 @@ class ReadProgress():
 
             copysize = humanize(self.copied)
             totalsize = humanize(self.total)
-            print("{:.1f}%\t{} [{}/{}]".format(percent, speed, copysize,
-                                               totalsize))
+            if sys.stdout.isatty():
+                print("{:.1f}%\t{} [{}/{}]".format(percent, speed, copysize,
+                                                   totalsize))
 
     def read(self, n: int) -> bytes:
         chunk = self.r.read(n)
