@@ -2,7 +2,10 @@
 [![PyPI](https://img.shields.io/pypi/v/adbutils.svg?color=blue)](https://pypi.org/project/adbutils/#history)
 [![codecov](https://codecov.io/gh/openatx/adbutils/graph/badge.svg?token=OuGOMZUkmi)](https://codecov.io/gh/openatx/adbutils)
 
-Python adb library for adb service (Only support Python3.6+), Recommend 3.8+
+Python adb library for adb service
+
+# Requires
+Python 3.8+
 
 **Table of Contents**
 
