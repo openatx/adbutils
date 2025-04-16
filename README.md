@@ -39,6 +39,9 @@ Python 3.8+
 # Install
 ```
 pip3 install adbutils
+
+# or
+pip3 install adbutils[all]
 ```
 
 # Usage

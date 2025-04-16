@@ -6,18 +6,14 @@
 
 import abc
 import logging
-import os
 from pathlib import Path
 import re
-import subprocess
 import tempfile
 import time
 import typing
 
 import requests
-import apkutils
 from typing import Optional, Union
-from retry import retry
 from adbutils.errors import AdbInstallError
 from adbutils.sync import Sync
 from adbutils._utils import humanize, ReadProgress
@@ -72,8 +68,8 @@ class InstallExtension(AbstractDevice):
         except requests.exceptions.RequestException as e:
             logger.warning(f"Failed to download APK from {url}: {e}")
             raise
-        
-    # @retry(BrokenPipeError, delay=5.0, jitter=[3, 5], tries=3)
+    
+
     def install(self,
                 path_or_url: Union[str, Path],
                 nolaunch: bool = False,
@@ -81,6 +77,22 @@ class InstallExtension(AbstractDevice):
                 silent: bool = False,
                 callback: typing.Callable[[str], None] = None,
                 flags: list = ["-r", "-t"]):
+        try:
+            import apkutils
+            has_apkutils = True
+        except ImportError:
+            logger.warning("apkutils is not installed, install it with 'pip install adbutils[apk]'")
+            has_apkutils = False
+        self._install(path_or_url, nolaunch, uninstall, silent, callback, flags, has_apkutils)
+
+    def _install(self,
+                path_or_url: Union[str, Path],
+                nolaunch: bool = False,
+                uninstall: bool = False,
+                silent: bool = False,
+                callback: typing.Callable[[str], None] = None,
+                flags: list = ["-r", "-t"],
+                has_apkutils: bool = True):
         """
         Install APK to device
 
@@ -91,6 +103,7 @@ class InstallExtension(AbstractDevice):
             silent: disable log message print
             callback: only two event now: <"BEFORE_INSTALL" | "FINALLY">
             flags (list): default ["-r", "-t"]
+            has_apkutils: whether apkutils is installed
 
         Raises:
             AdbInstallError, BrokenPipeError
@@ -111,17 +124,22 @@ class InstallExtension(AbstractDevice):
         if not src_path.is_file():
             raise FileNotFoundError(f"File or URL not found: {path_or_url}")
         
-        with apkutils.APK.from_file(str(src_path)) as apk:
-            activities = apk.get_main_activities()
-            main_activity = activities[0] if activities else None
-            package_name = apk.get_package_name()
-            if main_activity and main_activity.find(".") == -1:
-                main_activity = "." + main_activity
+        package_name = None
+        main_activity = None
+        
+        if has_apkutils:
+            import apkutils
+            with apkutils.APK.from_file(str(src_path)) as apk:
+                activities = apk.get_main_activities()
+                main_activity = activities[0] if activities else None
+                package_name = apk.get_package_name()
+                if main_activity and main_activity.find(".") == -1:
+                    main_activity = "." + main_activity
             
-        dprint(f"APK packageName: {package_name}")
-        dprint(f"APK mainActivity: {main_activity}")
+            dprint(f"APK packageName: {package_name}")
+            dprint(f"APK mainActivity: {main_activity}")
 
-        device_dst = f"/data/local/tmp/{package_name}.apk"
+        device_dst = f"/data/local/tmp/{package_name or 'unknown'}.apk"
         dprint(f'push apk to device: {device_dst}')
         self._push_apk(src_path, device_dst, show_progress=not silent)
 
@@ -130,7 +148,7 @@ class InstallExtension(AbstractDevice):
         if not info.size == apk_size:
             AdbInstallError(f'pushed apk size not matched, expect {apk_size} got {info.size}')
         
-        if uninstall:
+        if uninstall and package_name:
             dprint(f"uninstall app: {package_name}")
             self.uninstall(package_name)
 
@@ -143,12 +161,12 @@ class InstallExtension(AbstractDevice):
             self.install_remote(device_dst, clean=True, flags=flags)
             time_used = time.time() - start
             dprint(f"successfully installed, time used {time_used:.1f} seconds")
-            if not nolaunch:
+            if not nolaunch and package_name and main_activity:
                 dprint("launch app: %s/%s" % (package_name, main_activity))
                 self.app_start(package_name, main_activity)
 
         except AdbInstallError as e:
-            if e.reason in [
+            if package_name and e.reason in [
                 "INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE",
                 "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
                 "INSTALL_FAILED_VERSION_DOWNGRADE"
@@ -157,7 +175,7 @@ class InstallExtension(AbstractDevice):
                 self.uninstall(package_name)
                 self.install_remote(device_dst, clean=True, flags=flags)
                 dprint(f"successfully installed, time used {time.time() - start} seconds")
-                if not nolaunch:
+                if not nolaunch and main_activity:
                     dprint(f"Launch app: {package_name}/{main_activity}")
                     self.app_start(package_name, main_activity)
             else:
