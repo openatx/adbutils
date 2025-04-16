@@ -21,4 +21,7 @@ else:
         python_requires=">=3.8",
         pbr=True,
         package_data={"adbutils": ["py.typed"]},
+        extras_require={
+            "all": ["apkutils>=2.0.0,<3.0"],
+        },
     )

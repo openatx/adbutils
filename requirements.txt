@@ -2,4 +2,5 @@ requests
 deprecation>=2.0.6,<3.0
 retry>=0.9
 Pillow
-apkutils>=2.0.0,<3.0
+# Optional dependencies
+# apkutils>=2.0.0,<3.0  # Required for APK installation

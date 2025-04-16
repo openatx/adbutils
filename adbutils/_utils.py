@@ -208,21 +208,20 @@ class APKReader:
     
     def dump_info(self):
         try:
-            from apkutils2.axml.axmlparser import AXML
-            from apkutils2.manifest import Manifest
+            from apkutils import APK
         except ImportError:
-            sys.exit("apkutils2 is not installed, please install it first")
-        zf = zipfile.ZipFile(self._fp)
-        raw_manifest = zf.read("AndroidManifest.xml")
-        axml = AXML(raw_manifest)
-        if not axml.is_valid:
-            print("axml is invalid")
-            return
-        am = Manifest(axml.get_xml())
-        print("package:", am.package_name)
-        print("main-activity:", am.main_activity)
-        print("version-name:", am.version_name)
-        print("version-code:", am.version_code)
+            sys.exit("apkutils is not installed, please install it first")
+        apk = APK.from_io(self._fp)
+        activities = apk.get_main_activities()
+        main_activity = activities[0] if activities else None
+        package_name = apk.get_package_name()
+        if main_activity and main_activity.find(".") == -1:
+            main_activity = "." + main_activity
+        
+        print("package:", package_name)
+        print("main-activity:", main_activity)
+        print("version-name:", apk._version_name)
+        print('version-code:', apk._version_code)
 
 
 class StopEvent:
