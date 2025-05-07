@@ -377,7 +377,6 @@ class BaseDevice:
             c.check_okay()
         else:
             raise ValueError("Unsupported network type", network)
-        c._finalizer.detach()
         return c.conn
 
     def root(self):
