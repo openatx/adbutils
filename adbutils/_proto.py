@@ -115,6 +115,7 @@ class ShellReturn:
     command: str
     returncode: int
     output: str | bytes
+    stderr: str | bytes | None = None
 
 
 @dataclass
