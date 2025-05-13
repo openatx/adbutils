@@ -50,6 +50,7 @@ class BaseDevice:
         self._serial = serial
         self._transport_id = transport_id
         self._properties = {}  # store properties data
+        self._features = {}
 
         if not serial and not transport_id:
             raise AdbError("serial, transport_id must set atleast one")
@@ -113,7 +114,9 @@ class BaseDevice:
         Return example:
             'abb_exec,fixed_push_symlink_timestamp,abb,stat_v2,apex,shell_v2,fixed_push_mkdir,cmd'
         """
-        return self._get_with_command("features")
+        features = self._get_with_command("features")
+        self._features = set(features.split(','))
+        return features
 
     @property
     def info(self) -> dict:
@@ -155,6 +158,36 @@ class BaseDevice:
                     "subprocess", cmds, e.output.decode("utf-8", errors="ignore")
                 )
 
+    def __shell(
+        self,
+        cmdargs: str | list | tuple,
+        stream: bool = False,
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: str | None = "utf-8",
+        rstrip=False,
+        shell_v2=False
+    ) -> typing.Union[AdbConnection, ShellReturn]:
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = list2cmdline(cmdargs)
+        if stream:
+            timeout = None
+        c = self.open_transport(timeout=timeout)
+        c.send_command(f"shell{',v2'*shell_v2}:" + cmdargs)
+        c.check_okay()
+        if stream:
+            return c
+        stdout, stderr, exit_code = "", None, -1
+        if shell_v2:
+            stdout, stderr, exit_code = c.read_shell_v2_protocol_until_close(encoding=encoding)
+        else:
+            stdout = c.read_until_close(encoding=encoding)
+        c.close()
+        if encoding:
+            stdout = stdout.rstrip() if rstrip else stdout
+            if stderr:
+                stderr = stderr.rstrip() if rstrip else stderr
+        return ShellReturn(command=cmdargs, returncode=exit_code, output=stdout, stderr=stderr)
+
     def shell(
         self,
         cmdargs: Union[str, list, tuple],
@@ -184,21 +217,7 @@ class BaseDevice:
             shell(["ls", "-l"])
             shell("ls | grep data")
         """
-        if isinstance(cmdargs, (list, tuple)):
-            cmdargs = list2cmdline(cmdargs)
-        if stream:
-            timeout = None
-        c = self.open_transport(timeout=timeout)
-        c.send_command("shell:" + cmdargs)
-        c.check_okay()
-        if stream:
-            return c
-        output = c.read_until_close(encoding=encoding)
-        # https://github.com/openatx/uiautomator2/issues/998
-        c.close()
-        if encoding:
-            return output.rstrip() if rstrip else output
-        return output
+        return self.__shell(cmdargs=cmdargs, stream=stream, timeout=timeout, encoding=encoding, rstrip=rstrip, shell_v2=False).output
 
     def shell2(
         self,
@@ -206,6 +225,7 @@ class BaseDevice:
         timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
         encoding: str | None = "utf-8",
         rstrip=False,
+        shell_v2=False,
     ) -> ShellReturn:
         """
         Run shell command with detail output
@@ -214,6 +234,7 @@ class BaseDevice:
             timeout (float): set shell timeout, seconds
             encoding (str): set output encoding (Default: utf-8), set None to make return bytes
             rstrip (bool): strip the last empty line, only work when encoding is set
+            shell_v2 (bool): attempt to use the shell_v2 protocol (and fail if not supported by device)
 
         Returns:
             ShellOutput
@@ -223,18 +244,27 @@ class BaseDevice:
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = list2cmdline(cmdargs)
-        assert isinstance(cmdargs, str)
-        MAGIC = "X4EXIT:"
-        newcmd = cmdargs + f"; echo {MAGIC}$?"
-        output = self.shell(newcmd, timeout=timeout, encoding=encoding, rstrip=True)
-        rindex = output.rfind(MAGIC if encoding else MAGIC.encode())
-        if rindex == -1:  # normally will not possible
-            raise AdbError("shell output invalid", newcmd, output)
-        returncoode = int(output[rindex + len(MAGIC) :])
-        output = output[:rindex]
-        if rstrip and encoding:
-            output = output.rstrip()
-        return ShellReturn(command=cmdargs, returncode=returncoode, output=output)
+        if shell_v2 and not self._features:
+            self._features = set(self.get_features().split(','))
+        if shell_v2 and "shell_v2" not in self._features:
+            raise AdbError("shell_v2 specified but not supported by device")
+
+        if shell_v2:
+            result = self.__shell(cmdargs, timeout=timeout, encoding=encoding, rstrip=rstrip, shell_v2=True)
+        else:
+            assert isinstance(cmdargs, str)
+            MAGIC = "X4EXIT:"
+            newcmd = cmdargs + f"; echo {MAGIC}$?"
+            result = self.__shell(newcmd, timeout=timeout, encoding=encoding, rstrip=rstrip)
+            rindex = result.output.rfind(MAGIC if encoding else MAGIC.encode())
+            if rindex == -1:  # normally will not possible
+                raise AdbError("shell output invalid", newcmd, result.output)
+            result.returncode = int(result.output[rindex + len(MAGIC) :])
+            result.output = result.output[:rindex]
+            result.command = cmdargs
+            if rstrip and encoding:
+                result.output = result.output.rstrip()
+        return result
 
     def forward(self, local: str, remote: str, norebind: bool = False):
         self._client.forward(self._serial, local, remote, norebind)

@@ -8,6 +8,7 @@ import asyncio
 import functools
 import logging
 import re
+import struct
 from typing import Union, overload
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,10 @@ class Context:
         self.writer.close()
         await self.writer.wait_closed()
 
+    async def send_shell_v2(self, stream_id: int, payload: bytes):
+        header = bytes([stream_id]) + len(payload).to_bytes(4, "little")
+        await self.send(header + payload)
+
 
 @register_command("host:version")
 async def host_version(ctx: Context):
@@ -98,6 +103,11 @@ async def host_kill(ctx: Context):
 async def host_list_forward(ctx: Context):
     await ctx.send(b"OKAY")
     await ctx.send(encode_string("123456 tcp:1234 tcp:4321"))
+
+@register_command(re.compile("host-serial:[0-9]*:features.*"))
+async def host_serial_features(ctx: Context):
+    await ctx.send(b"OKAY")
+    await ctx.send(encode_string("shell_v2,fake_feature"))
 
 
 def enable_devices():
@@ -131,7 +141,26 @@ SHELL_DEBUGS = {
 
 SHELL_OUTPUTS = {
     "pwd": "/",
+    "pwd; echo X4EXIT:$?": "/\nX4EXIT:0"
 }
+
+SHELL_V2_COMMANDS = {
+    "v2-stdout-only": {
+        "stdout": b"this is stdout\n",
+        "stderr": b"",
+        "exit": 0,
+    },
+    "v2-stdout-stderr": {
+        "stdout": b"this is stdout\n",
+        "stderr": b"this is stderr\n",
+        "exit": 1,
+    },
+}
+
+
+def send_shell_v2(writer, stream_id: int, payload: bytes):
+    length = struct.pack(">I", len(payload))
+    return writer.send(bytes([stream_id]) + length + payload)
 
 @register_command(re.compile("host:tport:serial:.*"))
 async def host_tport_serial(ctx: Context):
@@ -139,25 +168,42 @@ async def host_tport_serial(ctx: Context):
     if serial == "not-found":
         await ctx.send(b"FAIL")
         await ctx.send(encode("device not found"))
+        return
     else:
         await ctx.send(b"OKAY")
         await ctx.send(b"\x00\x00\x00\x00\x00\x00\x00\x00")
 
     cmd = await ctx.recv_string_block()
-    if not cmd.startswith("shell:"):
+    if cmd.startswith("shell,v2:"):
+        await ctx.send(b"OKAY")
+        shell_cmd = cmd.split(":", 1)[1]
+
+        result = SHELL_V2_COMMANDS.get(shell_cmd)
+        if result is None:
+            await ctx.send_shell_v2(2, b"unknown shell_v2 command\n")
+            await ctx.send_shell_v2(3, b"\x01")
+            return
+
+        if result["stdout"]:
+            await ctx.send_shell_v2(1, result["stdout"])
+        if result["stderr"]:
+            await ctx.send_shell_v2(2, result["stderr"])
+        await ctx.send_shell_v2(3, bytes([result["exit"]]))
+
+    elif cmd.startswith("shell:"):
+        await ctx.send(b"OKAY")
+        shell_cmd = cmd.split(":", 1)[1]
+        if shell_cmd in SHELL_OUTPUTS:
+            await ctx.send((SHELL_OUTPUTS[shell_cmd].rstrip() + "\n").encode())
+        elif shell_cmd in SHELL_DEBUGS:
+            SHELL_DEBUGS[shell_cmd]()
+            await ctx.send(b"debug command executed")
+        else:
+            await ctx.send(b"unknown command")
+    else:
         await ctx.send(b"FAIL")
         await ctx.send(encode("unsupported command"))
-        return
-    await ctx.send(b"OKAY")
-    shell_cmd = cmd.split(":", 1)[1]
-    if shell_cmd in SHELL_OUTPUTS:
-        await ctx.send((SHELL_OUTPUTS[shell_cmd].rstrip() + "\n").encode())
-    elif shell_cmd in SHELL_DEBUGS:
-        SHELL_DEBUGS[shell_cmd]()
-        await ctx.send(b"debug command executed")
-    else:
-        await ctx.send(b"unknown command")
-    
+
 
 async def handle_command(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer"):
     try:

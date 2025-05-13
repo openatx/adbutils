@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import platform
 import socket
@@ -129,6 +130,15 @@ class AdbConnection(object):
             t = n - len(buffer)
         return buffer
 
+    def read_exact(self, n: int) -> bytes:
+        try:
+            data = self._read_fully(n)
+        except socket.timeout:
+            raise AdbTimeout("adb read timeout")
+        if len(data) < n:
+            raise EOFError(f"Expected {n} bytes, got {len(data)}")
+        return data
+
     def send_command(self, cmd: str):
         cmd_bytes = cmd.encode("utf-8")
         self.conn.send("{:04x}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes)
@@ -160,6 +170,37 @@ class AdbConnection(object):
                 break
             content += chunk
         return content.decode(encoding, errors='replace') if encoding else content
+
+    def read_shell_v2_protocol_until_close(self, encoding: str | None = "utf-8") -> tuple[bytes|str, bytes|str, int]:
+        stdout_buffer = io.BytesIO()
+        stderr_buffer = io.BytesIO()
+        exit_code = 255
+
+        while True:
+            header = self.read_exact(5)
+
+            msg_id = header[0]
+            length = int.from_bytes(header[1:5], byteorder="little")
+
+            if length == 0:
+                continue
+
+            data = self.read_exact(length)
+
+            if msg_id == 1:
+                stdout_buffer.write(data)
+            elif msg_id == 2:
+                stderr_buffer.write(data)
+            elif msg_id == 3:
+                exit_code = data[0]
+                break
+
+        return (
+            (stdout := stdout_buffer.getvalue()).decode(encoding, errors="replace") if encoding else stdout,
+            (stderr := stderr_buffer.getvalue()).decode(encoding, errors="replace") if encoding else stderr,
+            exit_code,
+        )
+
 
     def check_okay(self):
         data = self.read(4)
