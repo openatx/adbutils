@@ -17,15 +17,30 @@ def test_shell_pwd(adb: adbutils.AdbClient):
 
 def test_shell2_pwd(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")
-    assert d.shell2("pwd") == ShellReturn(command='pwd', returncode=0, output='/\n', stderr=None)
+    assert d.shell2("pwd") == ShellReturn(
+        command='pwd', 
+        returncode=0, 
+        output='/\n',
+    )
 
 def test_shellv2_stdout(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")
-    assert d.shell2("v2-stdout-only", shell_v2=True) == ShellReturn(command='v2-stdout-only', returncode=0, output='this is stdout\n', stderr='')
+    assert d.shell2("v2-stdout-only", v2=True) == ShellReturn(
+        command='v2-stdout-only', 
+        returncode=0, 
+        output='this is stdout\n', 
+        stdout='this is stdout\n',
+    )
 
 def test_shellv2_stderr(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")
-    assert d.shell2("v2-stdout-stderr", rstrip=True, shell_v2=True) == ShellReturn(command='v2-stdout-stderr', returncode=1, output='this is stdout', stderr='this is stderr')
+    assert d.shell2("v2-stdout-stderr", rstrip=True, v2=True) == ShellReturn(
+        command='v2-stdout-stderr', 
+        returncode=1, 
+        output='this is stdout\nthis is stderr',
+        stdout='this is stdout',
+        stderr='this is stderr'
+    )
 
 def test_shell_screenshot(adb: adbutils.AdbClient):
     d = adb.device(serial="123456")

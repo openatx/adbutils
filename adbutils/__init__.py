@@ -7,6 +7,7 @@ import io
 import os
 import typing
 
+from typing import Iterator, List, Optional, Union
 from deprecation import deprecated
 
 from adbutils._adb import AdbConnection
@@ -28,12 +29,12 @@ class AdbClient(_BaseClient):
                 details="use AdbDevice.shell instead")
     def shell(self,
               serial: str,
-              command: typing.Union[str, list, tuple],
+              command: Union[str, list, tuple],
               stream: bool = False,
-              timeout: typing.Optional[float] = None) -> typing.Union[str, AdbConnection]:
-        return self.device(serial).shell(command, stream=stream, timeout=timeout)
+              timeout: Optional[float] = None) -> Union[str, AdbConnection]:
+        return self.device(serial).shell(command, stream=stream, timeout=timeout, encoding='utf-8')
 
-    def list(self, extended=False) -> typing.List[AdbDeviceInfo]:
+    def list(self, extended=False) -> List[AdbDeviceInfo]:
         """
         Returns:
             list of device info, including offline
@@ -57,7 +58,7 @@ class AdbClient(_BaseClient):
                 infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1], tags=tags))
         return infos
 
-    def iter_device(self) -> typing.Iterator[AdbDevice]:
+    def iter_device(self) -> Iterator[AdbDevice]:
         """
         Returns:
             iter only AdbDevice with state:device
@@ -71,8 +72,8 @@ class AdbClient(_BaseClient):
         return list(self.iter_device())
 
     def device(self,
-               serial: str = None,
-               transport_id: int = None) -> AdbDevice:
+               serial: Optional[str] = None,
+               transport_id: Optional[int] = None) -> AdbDevice:
         if serial:
             return AdbDevice(self, serial=serial)
         

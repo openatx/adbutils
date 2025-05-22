@@ -9,7 +9,7 @@ import functools
 import logging
 import re
 import struct
-from typing import Union, overload
+from typing import Union, Callable, overload
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,9 @@ def encode_bytes(s: bytes) -> bytes:
 
 
 
-COMMANDS: dict[Union[str, re.Pattern], callable] = {}
+COMMANDS: dict[Union[str, re.Pattern], Callable] = {}
 
-def register_command(name: str):
+def register_command(name: Union[str, re.Pattern]):
     def wrapper(func):
         COMMANDS[name] = func
         return func
@@ -174,6 +174,7 @@ async def host_tport_serial(ctx: Context):
         await ctx.send(b"\x00\x00\x00\x00\x00\x00\x00\x00")
 
     cmd = await ctx.recv_string_block()
+    logger.info("recv shell cmd: %s", cmd)
     if cmd.startswith("shell,v2:"):
         await ctx.send(b"OKAY")
         shell_cmd = cmd.split(":", 1)[1]

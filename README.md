@@ -190,12 +190,12 @@ d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
 # The advanced shell (returncode archieved by add command suffix: ;echo EXIT:$?)
 ret = d.shell2("echo 1")
 print(ret)
-# expect: ShellReturn(args='echo 1', returncode=0, output='1\n', stderr=None)
+# expect: ShellReturn(args='echo 1', returncode=0, output='1\n')
 
-# Advanced shell using the shell_v2 protocol
-ret = d.shell2("echo 1; echo 2 1>&2", shell_v2=True)
+# Advanced shell using the shell v2 protocol
+ret = d.shell2("echo 1; echo 2 1>&2", v2=True)
 print(ret)
-# expect: ShellReturn(args='echo 1; echo 2 1>&2', returncode=0, output='1\n', stderr='2')
+# expect: ShellReturn(command='echo 1; echo 2 1>&2', returncode=0, output='1\n2\n', stderr='2\n', stdout='1\n')
 
 # show property, also based on d.shell
 print(d.prop.name) # output example: surabaya

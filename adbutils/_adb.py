@@ -173,37 +173,6 @@ class AdbConnection(object):
             content += chunk
         return content.decode(encoding, errors='replace') if encoding else content
 
-    def read_shell_v2_protocol_until_close(self, encoding: str | None = "utf-8") -> tuple[bytes|str, bytes|str, int]:
-        stdout_buffer = io.BytesIO()
-        stderr_buffer = io.BytesIO()
-        exit_code = 255
-
-        while True:
-            header = self.read_exact(5)
-
-            msg_id = header[0]
-            length = int.from_bytes(header[1:5], byteorder="little")
-
-            if length == 0:
-                continue
-
-            data = self.read_exact(length)
-
-            if msg_id == 1:
-                stdout_buffer.write(data)
-            elif msg_id == 2:
-                stderr_buffer.write(data)
-            elif msg_id == 3:
-                exit_code = data[0]
-                break
-
-        return (
-            (stdout := stdout_buffer.getvalue()).decode(encoding, errors="replace") if encoding else stdout,
-            (stderr := stderr_buffer.getvalue()).decode(encoding, errors="replace") if encoding else stderr,
-            exit_code,
-        )
-
-
     def check_okay(self):
         data = self.read(4)
         if data == _FAIL:
@@ -214,7 +183,12 @@ class AdbConnection(object):
 
 
 class BaseClient(object):
-    def __init__(self, host: str = None, port: int = None, socket_timeout: float = None):
+    def __init__(
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        socket_timeout: Optional[float] = None,
+    ):
         """
         Args:
             host (str): default value from env:ANDROID_ADB_SERVER_HOST
