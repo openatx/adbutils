@@ -80,8 +80,10 @@ class AdbConnection(object):
     def closed(self) -> bool:
         return self.__conn is None
 
-    def __del__(self):
-        self.close()
+    # https://github.com/openatx/adbutils/issues/169
+    # no need to close in __del__
+    # def __del__(self):
+    #     self.close()
 
     def close(self):
         if self.__conn is None:
