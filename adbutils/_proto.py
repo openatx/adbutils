@@ -105,24 +105,28 @@ class RunningAppInfo:
 
 
 @dataclass
-class ShellReturn:
-    """
-    Attributes:
-        command: The str command passed to run().
-        returncode: The exit code of the process, negative for signals.
-        output: the output
-    """
+class ShellReturnRaw:
     command: str
     returncode: int
-    output: str | bytes
-    stderr: str | bytes | None = None
+    stdout: bytes = b""
+    stderr: bytes = b""
+    output: bytes = b""
+
+
+@dataclass
+class ShellReturn:
+    command: str
+    returncode: int
+    output: str = ""
+    stderr: str = ""
+    stdout: str = ""
 
 
 @dataclass
 class AdbDeviceInfo:
     serial: str
     state: str
-    tags: dict[str] = field(default_factory={})
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 StrOrPathLike = Union[str, pathlib.Path]
