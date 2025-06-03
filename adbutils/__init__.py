@@ -65,7 +65,11 @@ class AdbClient(_BaseClient):
                 if len(parts) < num_required_fields:
                     continue
                 if extended:
-                    tags = {**tags, **{kv[0]: kv[1] for kv in list(map(lambda pair: pair.split(":"), parts[num_required_fields:]))}}
+                    for part in parts[num_required_fields:]:
+                        fields = part.split(':', 1)
+                        if len(fields) != 2:
+                            continue
+                        tags[fields[0]] = fields[1]
                 infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1], tags=tags))
         return infos
 

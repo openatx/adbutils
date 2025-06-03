@@ -87,7 +87,7 @@ def _get_bin_dir():
     return str(path.parent)
 
 
-def adb_path():
+def adb_path() -> str:
     # 0. check env: ADBUTILS_ADB_PATH
     if os.getenv("ADBUTILS_ADB_PATH"):
         return os.getenv("ADBUTILS_ADB_PATH")

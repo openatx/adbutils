@@ -150,6 +150,22 @@ class BaseDevice:
                     "subprocess", cmds, e.output.decode("utf-8", errors="ignore")
                 )
 
+    def open_shell(self, cmdargs: Union[str, list, tuple]) -> AdbConnection:
+        """Open a shell connection to the device
+
+        Args:
+            cmdargs (str | list | tuple): command args
+
+        Returns:
+            AdbConnection: shell connection object
+        """
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = list2cmdline(cmdargs)
+        c = self.open_transport()
+        c.send_command("shell:" + cmdargs)
+        c.check_okay()
+        return c
+    
     def shell(
         self,
         cmdargs: Union[str, list, tuple],
@@ -181,16 +197,17 @@ class BaseDevice:
         """
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = list2cmdline(cmdargs)
-        if stream:
-            timeout = None
-        c = self.open_transport(timeout=timeout)
-        c.send_command("shell:" + cmdargs)
-        c.check_okay()
+        c = self.open_shell(cmdargs)
         if stream:
             return c
-        output = c.read_until_close(encoding=encoding)
-        # https://github.com/openatx/uiautomator2/issues/998
-        c.close()
+        if timeout:
+            c.conn.settimeout(timeout)
+        try:
+            output = c.read_until_close(encoding=encoding)
+        finally:
+            # ensure the connection is closed
+            # https://github.com/openatx/uiautomator2/issues/998
+            c.close()
         if encoding:
             return output.rstrip() if rstrip else output
         return output

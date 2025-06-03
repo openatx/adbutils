@@ -11,6 +11,7 @@ from adbutils import AdbDevice, adb
 def test_package_info(device: AdbDevice):
     pinfo = device.app_current()
     pinfo = device.package_info(pinfo.package)
+    assert pinfo is not None
     assert 'version_name' in pinfo
 
 

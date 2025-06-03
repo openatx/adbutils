@@ -110,7 +110,15 @@ class AdbConnection(object):
         return self.__conn
     
     def send(self, data: bytes) -> int:
+        """ alias of conn.send(data) """
         return self.conn.send(data)
+    
+    def recv(self, n: int) -> bytes:
+        """ alias of conn.recv(n) """
+        try:
+            return self.conn.recv(n)
+        except socket.timeout:
+            raise AdbTimeout("adb recv timeout")
 
     def read(self, n: int) -> bytes:
         try:
@@ -247,7 +255,7 @@ class BaseClient(object):
                 c.send_command("host:kill")
                 c.check_okay()
 
-    def wait_for(self, serial: str = None, transport: str = 'any', state: str = "device", timeout: float=60):
+    def wait_for(self, serial: Optional[str] = None, transport: str = 'any', state: str = "device", timeout: float=60):
         """ Same as wait-for-TRANSPORT-STATE
         Args:
             serial (str): device serial [default None]
