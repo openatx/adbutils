@@ -4,43 +4,21 @@
 """Created on Sun Apr 07 2024 20:07:44 by codeskyblue
 """
 
-import abc
 import logging
-from pathlib import Path
 import re
 import tempfile
 import time
 import typing
+from pathlib import Path
+from typing import Optional, Union
 
 import requests
-from typing import Optional, Union
+
+from adbutils._interfaces import AbstractDevice
+from adbutils._utils import ReadProgress, humanize
 from adbutils.errors import AdbInstallError
-from adbutils.sync import Sync
-from adbutils._utils import humanize, ReadProgress
 
 logger = logging.getLogger(__name__)
-
-class AbstractDevice(abc.ABC):
-    @abc.abstractmethod
-    def shell(self, cmd: str) -> str:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def sync(self) -> Sync:
-        pass
-
-    @abc.abstractmethod
-    def app_start(self, package_name: str, activity: Optional[str] = None):
-        pass
-
-    @abc.abstractmethod
-    def uninstall(self, package_name: str):
-        pass
-
-    @abc.abstractmethod
-    def install_remote(self, path: str, clean: bool = False, flags: list = ["-r", "-t"]):
-        pass
 
 
 class InstallExtension(AbstractDevice):

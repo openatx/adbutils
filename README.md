@@ -52,9 +52,10 @@ Example
 import adbutils
 
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037)
-for info in adb.list():
+for info in adb.list(extended=True):
     print(info.serial, info.state)
     # <serial> <device|offline>
+    print(info.transport_id)
 
 # only list state=device
 print(adb.device_list())
@@ -186,6 +187,13 @@ serial = d.shell("getprop ro.serial")
 
 # Set timeout for shell command
 d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
+
+# Open shell as connection
+c = d.open_shell('cat') # AdbConnection, use c.conn to get socket.socket object
+c.send(b'hello\n')
+print(c.recv(100))
+c.close()
+# Expect output: b'hello\n'
 
 # The advanced shell (returncode archieved by add command suffix: ;echo EXIT:$?)
 ret = d.shell2("echo 1")

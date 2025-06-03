@@ -4,6 +4,12 @@ import pytest
 from adbutils import AdbClient, adb, AdbDevice
 
 
+@pytest.fixture
+def client():
+    """Create a new AdbClient instance."""
+    return AdbClient()
+
+
 @pytest.fixture(scope="session")
 def device():
     client = AdbClient() # port=5137

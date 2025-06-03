@@ -6,7 +6,7 @@ from __future__ import annotations
 
 __all__ = [
     "Network", "BrightnessMode", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
-    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo", "BatteryInfo"
+    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo", "BatteryInfo", "RunningAppInfo"
 ]
 
 import enum
@@ -56,7 +56,7 @@ class ReverseItem:
 class FileInfo:
     mode: int
     size: int
-    mtime: datetime.datetime
+    mtime: Optional[datetime.datetime]  # None if not available
     path: str
 
 
@@ -127,6 +127,11 @@ class AdbDeviceInfo:
     serial: str
     state: str
     tags: dict[str, str] = field(default_factory=dict)
+    
+    @property
+    def transport_id(self) -> Optional[int]:
+        """Get the transport ID from tags."""
+        return int(self.tags.get("transport_id", 0)) if "transport_id" in self.tags else None
 
 
 StrOrPathLike = Union[str, pathlib.Path]

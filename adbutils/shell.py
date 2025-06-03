@@ -4,9 +4,7 @@
 """Created on Sun Apr 07 2024 18:44:52 by codeskyblue
 """
 
-import abc
 import datetime
-import json
 import logging
 import re
 import time
@@ -15,6 +13,7 @@ from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo, Br
 from adbutils.errors import AdbError, AdbInstallError
 from adbutils._utils import escape_special_characters
 from retry import retry
+from adbutils._interfaces import AbstractShellDevice
 
 from adbutils.sync import Sync
 
@@ -28,16 +27,6 @@ _DISPLAY_RE = re.compile(
 def is_percent(v):
     return isinstance(v, float) and v <= 1.0
 
-
-class AbstractShellDevice(abc.ABC):
-    @abc.abstractmethod
-    def shell(self, cmd: Union[str, List[str]]) -> str:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def sync(self) -> Sync:
-        pass
 
 
 class ShellExtension(AbstractShellDevice):

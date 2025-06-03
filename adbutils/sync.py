@@ -15,10 +15,11 @@ import stat
 import pathlib
 from contextlib import contextmanager
 
-from adbutils._adb import BaseClient, AdbError
+from adbutils._adb import AdbError
 from adbutils._proto import FileInfo
 from adbutils._utils import append_path
 from adbutils.errors import AdbSyncError
+from adbutils._device_base import BaseDevice
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +32,12 @@ _DATA = "DATA"
 
 class Sync():
 
-    def __init__(self, adbclient: BaseClient, serial: str):
-        self._adbclient = adbclient
-        self._serial = serial
+    def __init__(self, device: BaseDevice):
+        self._device = device
 
     @contextmanager
     def _prepare_sync(self, path: str, cmd: str):
-        c = self._adbclient.make_connection()
-        try:
-            c.send_command(":".join(["host", "transport", self._serial]))
-            c.check_okay()
+        with self._device.open_transport(timeout=None) as c:
             c.send_command("sync:")
             c.check_okay()
             # {COMMAND}{LittleEndianPathLength}{Path}
@@ -49,8 +46,6 @@ class Sync():
                 cmd.encode("utf-8") + struct.pack("<I", path_len) +
                 path.encode("utf-8"))
             yield c
-        finally:
-            c.close()
 
     def exists(self, path: str) -> bool:
         finfo = self.stat(path)
