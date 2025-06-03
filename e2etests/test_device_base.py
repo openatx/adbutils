@@ -49,12 +49,15 @@ def test_get_xxx(device: AdbDevice):
     # assert device.get_devpath().startswith("usb:")
 
 
-def test_transport_sync(client: adbutils.AdbClient):
+def test_transport(client: adbutils.AdbClient):
     infos = client.list(extended=True)
     transport_id = infos[0].transport_id
     dev = client.device(transport_id=transport_id)
     files = dev.sync.list('/data/local/tmp')
     assert isinstance(files, list)
+    
+    forward_list = dev.forward_list()
+    assert isinstance(forward_list, list)
 
 
 def test_framebuffer(device: AdbDevice):
