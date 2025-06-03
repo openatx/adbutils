@@ -18,10 +18,21 @@ from adbutils._utils import adb_path, StopEvent
 from adbutils._version import __version__
 from adbutils.errors import *
 
+__all__ = [
+    'AdbDevice',
+    'AdbConnection', 
+    'AdbClient',
+    'Sync',
+    'StopEvent',
+    'AdbError',
+    'adb_path',
+    'adb',
+    'device',
+]
 
 class AdbClient(_BaseClient):
     def sync(self, serial: str) -> Sync:
-        return Sync(self, serial)
+        return Sync(self.device(serial))
 
     @deprecated(deprecated_in="0.15.0",
                 removed_in="1.0.0",
