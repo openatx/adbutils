@@ -311,7 +311,12 @@ class BaseDevice:
         )
 
     def forward(self, local: str, remote: str, norebind: bool = False):
-        self._client.forward(self._serial, local, remote, norebind)
+        cmd = "forward"
+        if norebind:
+            cmd += ":norebind"
+        cmd += f':{local};{remote}'
+        c = self.open_transport(cmd)
+        c.close()
 
     def forward_port(self, remote: Union[int, str]) -> int:
         """forward remote port to local random port"""
@@ -329,6 +334,17 @@ class BaseDevice:
         return local_port
 
     def forward_list(self) -> List[ForwardItem]:
+        cmd = 'list-forward'
+        with self.open_transport(cmd) as c:
+            content = c.read_string_block()
+            items = []
+            for line in content.splitlines():
+                parts = line.split()
+                if len(parts) != 3:
+                    continue
+                items.append(ForwardItem(*parts))
+            return items
+            
         items = self._client.forward_list()
         return [item for item in items if item.serial == self._serial]
 
