@@ -14,7 +14,6 @@ import subprocess
 import textwrap
 import threading
 import time
-from typing import Union
 import typing
 import weakref
 
@@ -23,32 +22,7 @@ from retry import retry
 from adbutils.errors import AdbError
 from adbutils._utils import adb_path
 from adbutils._adb import AdbConnection, Network
-from adbutils._proto import ShellReturn
-from adbutils.sync import Sync
-
-
-class AbstractDevice(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def serial(self) -> str:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def sync(self) -> Sync:
-        pass
-
-    @abc.abstractmethod
-    def shell(self, cmd: str, stream: bool = False) -> Union[str, AdbConnection]:
-        pass
-
-    @abc.abstractmethod
-    def shell2(self, cmd: str, stream=False) -> ShellReturn:
-        pass
-
-    @abc.abstractmethod
-    def remove(self, path: str):
-        pass
+from adbutils._interfaces import AbstractDevice
 
 
 class AbstractScreenrecord(abc.ABC):

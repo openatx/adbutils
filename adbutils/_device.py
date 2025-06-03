@@ -5,17 +5,8 @@
 
 from __future__ import annotations
 
-import io
-import logging
-import pathlib
-import re
-import socket
-import subprocess
-import threading
-import typing
-from typing import List, Optional, Union
+from typing import Optional
 
-from deprecation import deprecated
 
 from adbutils._deprecated import DeprecatedExtension
 from adbutils.install import InstallExtension
