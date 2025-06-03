@@ -7,19 +7,17 @@ from __future__ import annotations
 
 from typing import Optional
 
-
+from adbutils._adb import BaseClient
 from adbutils._deprecated import DeprecatedExtension
+from adbutils._device_base import BaseDevice
+from adbutils._proto import *
+from adbutils._version import __version__
 from adbutils.install import InstallExtension
 from adbutils.screenrecord import ScreenrecordExtension
 from adbutils.screenshot import ScreenshotExtesion
-
-from adbutils._adb import BaseClient
-from adbutils._proto import *
-from adbutils._version import __version__
 from adbutils.shell import ShellExtension
-
-from adbutils._device_base import BaseDevice
 from adbutils.sync import Sync
+
 
 class AdbDevice(
     BaseDevice,

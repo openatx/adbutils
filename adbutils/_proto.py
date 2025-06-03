@@ -56,7 +56,7 @@ class ReverseItem:
 class FileInfo:
     mode: int
     size: int
-    mtime: datetime.datetime
+    mtime: Optional[datetime.datetime]  # None if not available
     path: str
 
 

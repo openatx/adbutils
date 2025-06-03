@@ -15,7 +15,7 @@ import stat
 import pathlib
 from contextlib import contextmanager
 
-from adbutils._adb import BaseClient, AdbError
+from adbutils._adb import AdbError
 from adbutils._proto import FileInfo
 from adbutils._utils import append_path
 from adbutils.errors import AdbSyncError
@@ -32,9 +32,7 @@ _DATA = "DATA"
 
 class Sync():
 
-    def __init__(self, device: BaseDevice):  #adbclient: BaseClient, serial: str):
-        # self._adbclient = adbclient
-        # self._serial = serial
+    def __init__(self, device: BaseDevice):
         self._device = device
 
     @contextmanager
