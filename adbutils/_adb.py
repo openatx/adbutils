@@ -11,6 +11,7 @@ import os
 import platform
 import socket
 import subprocess
+import time
 import typing
 from typing import Iterator, List, Optional, Union
 
@@ -91,10 +92,13 @@ class AdbConnection(object):
         if self.__conn is None:
             return
         try:
-            self.__conn.shutdown(socket.SHUT_RDWR) # send FIN
+            # shutdown the write side of the socket
+            self.__conn.shutdown(socket.SHUT_WR)
+            # make sure the shutdown is processed
+            time.sleep(0.01)
         except OSError:
             pass
-        self.__conn.close()
+        self.__conn.close() # 真正释放资源
         self.__conn = None
 
     def __enter__(self):
