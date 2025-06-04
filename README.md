@@ -549,6 +549,12 @@ Some environment can affect the adbutils behavior
 - ANDROID_ADB_SERVER_HOST: default 127.0.0.1
 - ANDROID_ADB_SERVER_PORT: default 5037
 
+In docker environment, need to set
+
+```sh
+export ANDROID_ADB_SERVER_HOST=host.docker.internal
+```
+
 ## Watch adb socket data
 Watch the adb socket data using `socat`
 
@@ -591,6 +597,7 @@ gh-md-toc --insert README.md
 
 # Alternative
 - https://github.com/Swind/pure-python-adb
+- https://github.com/touxiaoling/adbutils_async
 
 # Ref
 - <https://github.com/imageio/imageio-ffmpeg/blob/80e37882d0/imageio_ffmpeg/_utils.py>

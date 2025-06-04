@@ -80,11 +80,17 @@ class BaseDevice:
                 c.send_command(f"host:transport-id:{self._transport_id}")
                 c.check_okay()
             elif self._serial:
-                # host:tport:serial:xxx is also fine, but receive 12 bytes
-                # recv: 4f 4b 41 59 14 00 00 00 00 00 00 00              OKAY........
-                c.send_command(f"host:tport:serial:{self._serial}")
-                c.check_okay()
-                c.read(8)  # skip 8 bytes
+                # compatible with old adb version
+                # https://github.com/openatx/adbutils/issues/145
+                if self._client.server_version() >= 41:
+                    c.send_command(f"host:tport:serial:{self._serial}")
+                    c.check_okay()
+                    c.read(8)  # skip 8 bytes
+                else: # tested on 39,40
+                    # 1.0.40 https://dl.google.com/android/repository/platform-tools_r28.0.1-darwin.zip
+                    # 1.0.39 https://dl.google.com/android/repository/platform-tools_r26.0.1-darwin.zip
+                    c.send_command("host:transport:" + self._serial)
+                    c.check_okay()
             else:
                 raise RuntimeError("should not reach here")
         return c

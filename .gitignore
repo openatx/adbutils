@@ -108,3 +108,4 @@ ChangeLog
 .vscode/
 .DS_Store
 .idea/
+tmp/
