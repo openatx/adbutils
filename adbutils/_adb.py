@@ -151,6 +151,7 @@ class AdbConnection(object):
         except socket.timeout:
             raise AdbTimeout("adb read timeout")
         if len(data) < n:
+            self.close()
             raise EOFError(f"Expected {n} bytes, got {len(data)}")
         return data
 
@@ -169,6 +170,7 @@ class AdbConnection(object):
         """
         length = self.read_string(4)
         if not length:
+            self.close()
             raise AdbError("connection closed")
         size = int(length, 16)
         return self.read_string(size)
@@ -188,10 +190,13 @@ class AdbConnection(object):
 
     def check_okay(self):
         data = self.read(4)
+        if data == _OKAY:
+            return
+        
+        self.close()
         if data == _FAIL:
             raise AdbError(self.read_string_block())
-        elif data == _OKAY:
-            return
+        
         raise AdbError("Unknown data: %r" % data)
 
 
