@@ -452,28 +452,35 @@ class BaseDevice:
             socket object
 
         Raises:
-            AssertionError, ValueError
+            AdbError, ValueError
         """
+        def _connect(c: AdbConnection) -> socket.socket:
+            if network == Network.TCP:
+                assert isinstance(address, int)
+                c.send_command("tcp:" + str(address))
+                c.check_okay()
+            elif network in [Network.UNIX, Network.LOCAL_ABSTRACT]:
+                assert isinstance(address, str)
+                c.send_command("localabstract:" + address)
+                c.check_okay()
+            elif network in [
+                Network.LOCAL_FILESYSTEM,
+                Network.LOCAL,
+                Network.DEV,
+                Network.LOCAL_RESERVED,
+            ]:
+                c.send_command(network + ":" + str(address))
+                c.check_okay()
+            else:
+                raise ValueError("Unsupported network type", network)
+            return c.conn
+        
         c = self.open_transport()
-        if network == Network.TCP:
-            assert isinstance(address, int)
-            c.send_command("tcp:" + str(address))
-            c.check_okay()
-        elif network in [Network.UNIX, Network.LOCAL_ABSTRACT]:
-            assert isinstance(address, str)
-            c.send_command("localabstract:" + address)
-            c.check_okay()
-        elif network in [
-            Network.LOCAL_FILESYSTEM,
-            Network.LOCAL,
-            Network.DEV,
-            Network.LOCAL_RESERVED,
-        ]:
-            c.send_command(network + ":" + str(address))
-            c.check_okay()
-        else:
-            raise ValueError("Unsupported network type", network)
-        return c.conn
+        try:
+            return _connect(c)
+        except:
+            c.close()
+            raise
 
     def root(self):
         """restart adbd as root
