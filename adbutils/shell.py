@@ -513,6 +513,8 @@ class ShellExtension(AbstractShellDevice):
         output = self.shell(["dumpsys", "battery"])
         shell_kvs = {}
         for line in output.splitlines():
+            if ":" not in line:
+                continue
             key, val = line.strip().split(':', 1)
             shell_kvs[key.strip()] = val.strip()
 
