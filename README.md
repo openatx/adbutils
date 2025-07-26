@@ -294,6 +294,9 @@ d.click(0.5, 0.5) # center, should be float and <= 1.0
 # swipe from(10, 10) to(200, 200) 500ms
 d.swipe(10, 10, 200, 200, 0.5)
 
+# drag and drop from(10, 10) to(200, 200) 3000ms
+d.swipe(10, 10, 200, 200, 3)
+
 d.list_packages()
 # example output: ["com.example.hello"]
 
