@@ -284,37 +284,40 @@ class BaseDevice:
 
     def _shell_v2(self, cmdargs: str, timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT) -> ShellReturnRaw:
         c = self.open_transport(timeout=timeout)
-        c.send_command(f"shell,v2:{cmdargs}")
-        c.check_okay()
-        stdout_buffer = io.BytesIO()
-        stderr_buffer = io.BytesIO()
-        output_buffer = io.BytesIO()
-        exit_code = 255
+        try:
+            c.send_command(f"shell,v2:{cmdargs}")
+            c.check_okay()
+            stdout_buffer = io.BytesIO()
+            stderr_buffer = io.BytesIO()
+            output_buffer = io.BytesIO()
+            exit_code = 255
 
-        while True:
-            header = c.read_exact(5)
-            msg_id = header[0]
-            length = int.from_bytes(header[1:5], byteorder="little")
-            if length == 0:
-                continue
+            while True:
+                header = c.read_exact(5)
+                msg_id = header[0]
+                length = int.from_bytes(header[1:5], byteorder="little")
+                if length == 0:
+                    continue
 
-            data = c.read_exact(length)
-            if msg_id == 1:
-                stdout_buffer.write(data)
-                output_buffer.write(data)
-            elif msg_id == 2:
-                stderr_buffer.write(data)
-                output_buffer.write(data)
-            elif msg_id == 3:
-                exit_code = data[0]
-                break
-        return ShellReturnRaw(
-            command=cmdargs,
-            returncode=exit_code,
-            output=output_buffer.getvalue(),
-            stderr=stderr_buffer.getvalue(),
-            stdout=stdout_buffer.getvalue(),
-        )
+                data = c.read_exact(length)
+                if msg_id == 1:
+                    stdout_buffer.write(data)
+                    output_buffer.write(data)
+                elif msg_id == 2:
+                    stderr_buffer.write(data)
+                    output_buffer.write(data)
+                elif msg_id == 3:
+                    exit_code = data[0]
+                    break
+            return ShellReturnRaw(
+                command=cmdargs,
+                returncode=exit_code,
+                output=output_buffer.getvalue(),
+                stderr=stderr_buffer.getvalue(),
+                stdout=stdout_buffer.getvalue(),
+            )
+        finally:
+            c.close()
 
     def forward(self, local: str, remote: str, norebind: bool = False):
         cmd = "forward"
