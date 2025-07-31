@@ -184,7 +184,7 @@ class ReadProgress():
 
             copysize = humanize(self.copied)
             totalsize = humanize(self.total)
-            if sys.stdout and sys.stdout.isatty():
+            if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
                 print("{:.1f}%\t{} [{}/{}]".format(percent, speed, copysize,
                                                    totalsize))
 
