@@ -191,6 +191,19 @@ class ShellExtension(AbstractShellDevice):
         x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
         self.shell(["input", "swipe", x1, y1, x2, y2, str(int(duration * 1000))])
 
+    def drag(self, sx, sy, ex, ey, duration: float = 1.0) -> None:
+        """
+        drag and drop from start point to end point
+        """
+        if any(map(is_percent, [sx, sy, ex, ey])):
+            w, h = self.window_size()
+            sx = int(sx * w) if is_percent(sx) else sx
+            sy = int(sy * h) if is_percent(sy) else sy
+            ex = int(ex * w) if is_percent(ex) else ex
+            ey = int(ey * h) if is_percent(ey) else ey
+        x1, y1, x2, y2 = map(str, [sx, sy, ex, ey])
+        self.shell(["input", "draganddrop", x1, y1, x2, y2, str(int(duration * 1000))])
+
     def click(self, x, y, display_id: Optional[int] = None) -> None:
         """
         simulate android tap

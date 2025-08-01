@@ -62,7 +62,10 @@ def test_switch_wifi(device: AdbDevice):
 
 
 def test_swipe(device: AdbDevice):
-    device.swipe(100, 100, 400, 400)
+    device.swipe(100, 100, 400, 1)
+
+def test_drag(device: AdbDevice):
+    device.drag(940, 1584, 400, 900, 4)
 
 
 def test_click(device: AdbDevice):
