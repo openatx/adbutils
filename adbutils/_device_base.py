@@ -390,7 +390,7 @@ class BaseDevice:
                 parts = line.split()
                 if len(parts) != 3:
                     continue
-            items.append(ReverseItem(*parts[1:]))
+                items.append(ReverseItem(*parts[1:]))
         return items
     
     def framebuffer(self) -> Image.Image:
