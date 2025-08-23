@@ -108,7 +108,7 @@ class _ScrcpyScreenRecord(AbstractScreenrecord):
         env["ADB"] = adb_path()
         env["ANDROID_SERIAL"] = self._d.serial
         self._p = subprocess.Popen(
-            [self._scrcpy_path, "--no-control", "--no-display", "--record", filename],
+            [self._scrcpy_path, "--no-control", "--no-window", "--no-playback", "--record", filename],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             env=env,
