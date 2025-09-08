@@ -108,16 +108,9 @@ class InstallExtension(AbstractDevice):
         if has_apkutils:
             import apkutils
             with apkutils.APK.from_file(str(src_path)) as apk:
-                # Support both old and new apkutils API
-                if hasattr(apk, 'get_main_activities'):
-                    # Old API (apkutils < 2.0.0)
-                    activities = apk.get_main_activities()
-                    package_name = apk.get_package_name()
-                else:
-                    # New API (apkutils >= 2.0.0)
-                    apk.get_manifest()
-                    activities = apk.get_manifest_main_activities()
-                    package_name = apk.package_name
+                apk.get_manifest()
+                activities = apk.get_manifest_main_activities()
+                package_name = apk.package_name
                 
                 main_activity = activities[0] if activities else None
                 if main_activity and main_activity.find(".") == -1:
