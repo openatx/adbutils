@@ -11,7 +11,12 @@ import socket
 import subprocess
 import threading
 import typing
-from typing import List, Optional, Union
+from typing import List, Optional, Union, overload
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 from PIL import Image, UnidentifiedImageError
 from deprecation import deprecated
@@ -172,6 +177,36 @@ class BaseDevice:
         c.check_okay()
         return c
     
+    @overload
+    def shell(
+        self,
+        cmdargs: Union[str, list, tuple],
+        stream: Literal[True],
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: str | None = "utf-8",
+        rstrip=True,
+    ) -> AdbConnection: ...
+    
+    @overload
+    def shell(
+        self,
+        cmdargs: Union[str, list, tuple],
+        stream: Literal[False] = False,
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: Literal[None] = None,
+        rstrip=True,
+    ) -> bytes: ...
+    
+    @overload
+    def shell(
+        self,
+        cmdargs: Union[str, list, tuple],
+        stream: Literal[False] = False,
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: str = "utf-8",
+        rstrip=True,
+    ) -> str: ...
+
     def shell(
         self,
         cmdargs: Union[str, list, tuple],
@@ -217,6 +252,26 @@ class BaseDevice:
         if encoding:
             return output.rstrip() if rstrip else output
         return output
+
+    @overload
+    def shell2(
+        self,
+        cmdargs: Union[str, list, tuple],
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: Literal[None] = None,
+        rstrip=False,
+        v2=False,
+    ) -> ShellReturnRaw: ...
+    
+    @overload
+    def shell2(
+        self,
+        cmdargs: Union[str, list, tuple],
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+        encoding: str = "utf-8",
+        rstrip=False,
+        v2=False,
+    ) -> ShellReturn: ...
 
     def shell2(
         self,
