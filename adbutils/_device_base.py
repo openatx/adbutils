@@ -191,9 +191,10 @@ class BaseDevice:
     def shell(
         self,
         cmdargs: Union[str, list, tuple],
+        *,
         stream: Literal[False] = False,
         timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
-        encoding: Literal[None] = None,
+        encoding: Literal[None],
         rstrip=True,
     ) -> bytes: ...
     
@@ -203,7 +204,17 @@ class BaseDevice:
         cmdargs: Union[str, list, tuple],
         stream: Literal[False] = False,
         timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
-        encoding: str = "utf-8",
+        *,
+        encoding: str,
+        rstrip=True,
+    ) -> str: ...
+    
+    @overload
+    def shell(
+        self,
+        cmdargs: Union[str, list, tuple],
+        stream: Literal[False] = False,
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
         rstrip=True,
     ) -> str: ...
 
@@ -258,7 +269,8 @@ class BaseDevice:
         self,
         cmdargs: Union[str, list, tuple],
         timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
-        encoding: Literal[None] = None,
+        *,
+        encoding: Literal[None],
         rstrip=False,
         v2=False,
     ) -> ShellReturnRaw: ...
@@ -268,7 +280,17 @@ class BaseDevice:
         self,
         cmdargs: Union[str, list, tuple],
         timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
-        encoding: str = "utf-8",
+        *,
+        encoding: str,
+        rstrip=False,
+        v2=False,
+    ) -> ShellReturn: ...
+    
+    @overload
+    def shell2(
+        self,
+        cmdargs: Union[str, list, tuple],
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
         rstrip=False,
         v2=False,
     ) -> ShellReturn: ...
