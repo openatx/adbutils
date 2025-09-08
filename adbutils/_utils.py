@@ -212,9 +212,11 @@ class APKReader:
         except ImportError:
             sys.exit("apkutils is not installed, please install it first")
         apk = APK.from_io(self._fp)
-        activities = apk.get_main_activities()
+        apk.get_manifest()
+        activities = apk.get_manifest_main_activities()
+        package_name = apk.package_name
+        
         main_activity = activities[0] if activities else None
-        package_name = apk.get_package_name()
         if main_activity and main_activity.find(".") == -1:
             main_activity = "." + main_activity
         
