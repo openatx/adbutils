@@ -92,9 +92,8 @@ class InstallExtension(AbstractDevice):
                 
         if isinstance(path_or_url, str) and re.match(r"^https?://", path_or_url):
             tmpfile = tempfile.NamedTemporaryFile(suffix=".apk")
+            tmpfile.close()
             self.download_apk(path_or_url, Path(tmpfile.name))
-            tmpfile.flush()
-            tmpfile.seek(0)
             src_path = Path(tmpfile.name)
             dprint(f"download apk to {src_path}")
         else:
