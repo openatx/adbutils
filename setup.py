@@ -22,6 +22,6 @@ else:
         pbr=True,
         package_data={"adbutils": ["py.typed"]},
         extras_require={
-            "all": ["apkutils>=2.0.0,<3.0"],
+            "all": ["apkutils>=2.0.1,<3.0"],
         },
     )
