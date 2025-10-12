@@ -434,6 +434,29 @@ class BaseDevice:
         items = self._client.forward_list()
         return [item for item in items if item.serial == self._serial]
 
+    def forward_close(self, local: str, raise_non_found: bool = True) -> None:
+        """
+        Remove existing forward local connection.
+
+        Args:
+            local (str): Local address of the forward to close, for example tcp:<port>
+            raise_non_found (bool): Whether to raise an `AdbError` if the local forward address
+                doesn't exist, default is True.
+        """
+        c: None | AdbConnection = None
+        try:
+            c = self.open_transport(f"killforward:{local}")
+        except AdbError:
+            if raise_non_found:
+                raise
+        finally:
+            if c:
+                c.close()
+
+    def forward_close_all(self) -> None:
+        """Remove all forwarded network connections."""
+        self.open_transport("killforward-all").close()
+
     def reverse(self, remote: str, local: str, norebind: bool = False):
         """
         Args:
