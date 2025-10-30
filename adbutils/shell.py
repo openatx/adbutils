@@ -12,10 +12,10 @@ from typing import List, Optional, Union
 from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo, BrightnessMode
 from adbutils.errors import AdbError, AdbInstallError
 from adbutils._utils import escape_special_characters
-from retry import retry
 from adbutils._interfaces import AbstractShellDevice
-
 from adbutils.sync import Sync
+
+from retry import retry
 
 logger = logging.getLogger(__name__)
 
@@ -229,8 +229,7 @@ class ShellExtension(AbstractShellDevice):
         Args:
             text: text to be type
         """
-        escaped_text = escape_special_characters(text)
-        return self.shell(["input", "text", escaped_text])
+        return self.shell(["input", "text", text])
 
     def wlan_ip(self) -> str:
         """get device wlan ip address"""
