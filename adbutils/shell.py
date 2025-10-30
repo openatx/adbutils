@@ -11,7 +11,6 @@ import time
 from typing import List, Optional, Union
 from adbutils._proto import WindowSize, AppInfo, RunningAppInfo, BatteryInfo, BrightnessMode
 from adbutils.errors import AdbError, AdbInstallError
-from adbutils._utils import escape_special_characters
 from adbutils._interfaces import AbstractShellDevice
 from adbutils.sync import Sync
 
