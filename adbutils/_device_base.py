@@ -434,7 +434,7 @@ class BaseDevice:
         items = self._client.forward_list()
         return [item for item in items if item.serial == self._serial]
 
-    def forward_close(self, local: str, raise_non_found: bool = True) -> None:
+    def forward_remove(self, local: str, raise_non_found: bool = True) -> None:
         """
         Remove existing forward local connection.
 
@@ -453,7 +453,7 @@ class BaseDevice:
             if c:
                 c.close()
 
-    def forward_close_all(self) -> None:
+    def forward_remove_all(self) -> None:
         """Remove all forwarded network connections."""
         self.open_transport("killforward-all").close()
 

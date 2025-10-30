@@ -124,11 +124,11 @@ d.forward("tcp:9999", "localabstract:scrcpy")
 port = d.forward_port("localabstract:scrcpy")
 print(port)  # 54622 (random)
 
-# close forwarded connection
-d.forward_close("tcp:9999")  # use local address
+# remove forwarded connection
+d.forward_remove("tcp:9999")  # use local address
 
-# close all forwarded connections tied to specific device
-d.forward_close_all()
+# remove all forwarded connections tied to specific device
+d.forward_remove_all()
 
 # list all forwards
 for item in adb.forward_list():
