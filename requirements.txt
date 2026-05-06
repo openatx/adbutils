@@ -1,5 +1,5 @@
 requests
-deprecation>=2.0.6,<3.0
+deprecation>=2.1.0,<3.0
 retry2>=0.9,<1.0
 Pillow
 # Optional dependencies
