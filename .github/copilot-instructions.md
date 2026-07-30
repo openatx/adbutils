@@ -99,7 +99,7 @@ docs/                     # Documentation
 ### Dependencies and Versions
 - **Python**: 3.8+ required (tested with 3.8 and 3.12)
 - **System**: ADB tool must be installed (`android-tools-adb` package)
-- **Runtime**: requests, deprecation, retry2, Pillow
+- **Runtime**: requests, deprecation, Pillow
 - **Optional**: apkutils (for APK parsing, install with `pip install adbutils[all]`)
 - **Development**: pytest, pytest-cov
 
