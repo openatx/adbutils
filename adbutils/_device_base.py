@@ -623,6 +623,27 @@ class BaseDevice:
             c.check_okay()
             return c.read_until_close()
 
+    def unroot(self):
+        """restart adbd as non-root
+
+        Return example:
+            adbd not running as root
+        """
+        with self.open_transport() as c:
+            c.send_command("unroot:")
+            c.check_okay()
+            return c.read_until_close()
+
+    def is_root(self) -> bool:
+        """check if device is rooted
+
+        Returns:
+            bool: True if rooted, False otherwise
+        """
+        result = self.shell2("echo $USER_ID").output
+        print(result)
+        return result.strip() == "0"
+
     def tcpip(self, port: int):
         """restart adbd listening on TCP on PORT
 

@@ -363,6 +363,10 @@ d.is_screen_on() # 返回屏幕是否亮屏 True or False
 
 # adb root
 d.root()
+# adb unroot
+d.unroot()
+# check if device is rooted
+d.is_root()
 
 # adb tcpip <port>
 d.tcpip(5555)
