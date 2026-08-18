@@ -386,18 +386,43 @@ class ShellExtension(AbstractShellDevice):
         pkgflags = m.group(1) if m else ""
         pkgflags = pkgflags.split()
 
+
+        def _deal_number_cover(text):
+            """转换任何语言的数字为英文数字"""
+            if not text:
+                return text
+
+            # 所有数字映射字典
+            DIGIT_MAPS = {
+                'arabic': dict(zip('٠١٢٣٤٥٦٧٨٩', '0123456789')),  # 阿拉伯语
+                'persian': dict(zip('۰۱۲۳۴۵۶۷۸۹', '0123456789')),  # 波斯语  乌尔都文
+                'hindi': dict(zip('०१२३४५६७८९', '0123456789')),  # 印地文 尼泊尔文 马拉地文
+                'bengali': dict(zip('০১২৩৪๕৬৭৮৯', '0123456789')),  # 孟加拉文
+                'thai': dict(zip('๐๑๒๓๔๕๖๗๘๙', '0123456789')),  # 泰语
+                'burmese': dict(zip('၀၁၂၃၄၅၆၇၈၉', '0123456789')),  # 缅甸文
+                'khmer': dict(zip('០១២៣៤៥៦៧៨៩', '0123456789')),  # 高棉文
+                'lao': dict(zip('໐໑໒໓໔໕໖໗໘໙', '0123456789')),  # 老挝文
+                'tamil': dict(zip('௦௧௨௩௪௫௬௭௮௯', '0123456789')),  # 泰米尔文
+                'gujarati': dict(zip('૦૧૨૩૪૫૬૭૮૯', '0123456789')),  # 古吉拉特文
+            }
+
+            result = text
+            for lang, digit_map in DIGIT_MAPS.items():
+                for native_digit, english_digit in digit_map.items():
+                    result = result.replace(native_digit, english_digit)
+            return result
         time_regex = r"[-\d]+\s+[:\d]+"
         m = re.compile(f"firstInstallTime=({time_regex})").search(output)
-        first_install_time = (
-            datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S") if m else None
-        )
+        try:
+            first_install_time = (datetime.datetime.strptime(_deal_number_cover(m.group(1)), "%Y-%m-%d %H:%M:%S") if m else None)
+        except (ValueError, TypeError) as e:
+            first_install_time = datetime.datetime(1970, 1, 1)
 
         m = re.compile(f"lastUpdateTime=({time_regex})").search(output)
-        last_update_time = (
-            datetime.datetime.strptime(m.group(1).strip(), "%Y-%m-%d %H:%M:%S")
-            if m
-            else None
-        )
+        try:
+            last_update_time = (datetime.datetime.strptime(_deal_number_cover(m.group(1)), "%Y-%m-%d %H:%M:%S") if m else None)
+        except (ValueError, TypeError) as e:
+            last_update_time = datetime.datetime(1970, 1, 1)
 
         app_info = AppInfo(
             package_name=package_name,
