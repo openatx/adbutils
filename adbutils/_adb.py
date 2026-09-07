@@ -100,6 +100,14 @@ class AdbConnection(object):
         self.__conn.close() # 真正释放资源
         self.__conn = None
 
+    def reconnect(self):
+        """ Close current connection and create a new one """
+        try:
+            self.close()
+        except Exception:
+            pass
+        self.__conn = self._safe_connect()
+
     def __enter__(self):
         return self
 
@@ -114,8 +122,12 @@ class AdbConnection(object):
     
     def send(self, data: bytes) -> int:
         """ alias of conn.send(data) """
-        return self.conn.send(data)
-    
+        try:
+            return self.conn.send(data)
+        except ConnectionResetError:
+            self.reconnect()
+            return self.conn.send(data)
+
     def recv(self, n: int) -> bytes:
         """ alias of conn.recv(n) """
         try:
@@ -137,7 +149,11 @@ class AdbConnection(object):
         t = n
         buffer = b''
         while t > 0:
-            chunk = self.conn.recv(t)
+            try:
+                chunk = self.conn.recv(t)
+            except ConnectionResetError:
+                self.reconnect()
+                return self._read_fully(n)
             if not chunk:
                 break
             buffer += chunk
@@ -155,7 +171,7 @@ class AdbConnection(object):
 
     def send_command(self, cmd: str):
         cmd_bytes = cmd.encode("utf-8")
-        self.conn.send("{:04x}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes)
+        self.send("{:04x}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes)
 
     def read_string(self, n: int) -> str:
         data = self.read(n).decode("utf-8", errors="replace")
