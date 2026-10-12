@@ -69,7 +69,7 @@ class ShellExtension(AbstractShellDevice):
     def brightness_value(self) -> int:
         """
         Return screen brightness value, [0, 255]
-        
+
         Examples:
             print(d.brightness_value) output：128
         """
@@ -102,7 +102,7 @@ class ShellExtension(AbstractShellDevice):
     def brightness_mode(self, mode: BrightnessMode):
         """
         Set screen brightness mode
-        
+
         Args:
             mode: BrightnessMode.AUTO or BrightnessMode.MANUAL
 
@@ -147,10 +147,10 @@ class ShellExtension(AbstractShellDevice):
 
         Args:
             landscape: bool, default None, if True, return (width, height), else return (height, width)
-            
+
         Returns:
             WindowSize
-        
+
         Raises:
             AdbError
         """
@@ -159,7 +159,7 @@ class ShellExtension(AbstractShellDevice):
             landscape = self.rotation() % 2 == 1
         logger.debug("get window size from 'wm size': %s %s", wsize, landscape)
         return WindowSize(wsize.height, wsize.width) if landscape else wsize
-    
+
     def _wm_size(self) -> WindowSize:
         output = self.shell("wm size")
         o = re.search(r"Override size: (\d+)x(\d+)", output)
@@ -304,14 +304,47 @@ class ShellExtension(AbstractShellDevice):
             result.append(m.group(1))
         return list(sorted(result))
 
-    def uninstall(self, pkg_name: str):
+    def uninstall(self, package_name: str, user_id: Optional[int] = None):
         """
-        Uninstall app by package name
+        Uninstall a package, optionally for one Android user.
 
         Args:
-            pkg_name (str): package name
+            package_name: Package name.
+            user_id: Android user ID. Specify an ID to remove an app for that user.
+                     Omitting it requests an uninstall for all users, which may fail for system apps.
+
+
+        Raises:
+            AdbError: If the command exits with a nonzero code.
         """
-        return self.shell(["pm", "uninstall", pkg_name])
+        args = ["pm", "uninstall"]
+        if user_id is not None:
+            args.extend(["--user", str(user_id)])
+        args.append(package_name)
+        output = self.shell2(args)
+        if output.returncode != 0:
+            raise AdbError(output.output.strip() or f"exit code {output.returncode}")
+
+
+    def install_existing(self, package_name: str, user_id: Optional[int] = None):
+        """
+        Restore a package whose APK is still present on the device.
+
+        Args:
+            package_name: Package name.
+            user_id: Android user ID, or None for the current user.
+
+
+        Raises:
+            AdbError if return code was nonezero
+        """
+        args = ["pm", "install-existing", "--wait"]
+        if user_id is not None:
+            args.extend(["--user", str(user_id)])
+        args.append(package_name)
+        output = self.shell2(cmdargs=args)
+        if output.returncode != 0:
+            raise AdbError(output.output.strip() or f"exit code {output.returncode}")
 
     def install_remote(
             self, remote_path: str, clean: bool = False, flags: list = ["-r", "-t"]
@@ -475,7 +508,7 @@ class ShellExtension(AbstractShellDevice):
 
         Returns:
             content of xml
-        
+
         Raises:
             AdbError
         """

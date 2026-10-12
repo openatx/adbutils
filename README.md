@@ -319,6 +319,13 @@ d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
 # raise AdbInstallError if something went wrong
 
+# Remove a system package for user 0
+d.uninstall(package_name="com.example.systemapp", user_id=0)
+
+# Restore that package for the same user
+# Raises AdbError if installation fails
+d.install_existing(package_name="com.example.systemapp", user_id=0)
+
 # simulate click
 d.click(100, 100)
 d.click(0.5, 0.5) # center, should be float and <= 1.0
