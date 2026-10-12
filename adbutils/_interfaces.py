@@ -17,10 +17,14 @@ class AbstractShellDevice(abc.ABC):
 
     @abc.abstractmethod
     def shell2(self, cmdargs: Union[str, List[str]]) -> ShellReturn:
-        """Run a command and return its output and exit code.
+        """
+        Run a command and return its output and exit code.
 
-        :param cmdargs: Command text or arguments.
-        :return: Shell command result.
+        Args:
+            cmdargs: Command text or arguments.
+
+        Returns:
+            Shell command result.
         """
         pass
 
@@ -34,23 +38,23 @@ class AbstractDevice(abc.ABC):
     @overload
     @abc.abstractmethod
     def shell(self, cmd: str, stream: Literal[True]) -> AdbConnection: ...
-    
+
     @overload
     @abc.abstractmethod
     def shell(self, cmd: str, stream: Literal[False] = False) -> str: ...
-    
+
     @abc.abstractmethod
     def shell(self, cmd: str, stream: bool = False) -> Union[str, AdbConnection]:
         pass
-    
+
     @overload
     @abc.abstractmethod
     def shell2(self, cmd: str, encoding: Literal[None]) -> ShellReturnRaw: ...
-    
+
     @overload
     @abc.abstractmethod
     def shell2(self, cmd: str, encoding: str = "utf-8") -> ShellReturn: ...
-    
+
     @abc.abstractmethod
     def shell2(self, cmd: str) -> ShellReturn:
         pass
@@ -71,7 +75,7 @@ class AbstractDevice(abc.ABC):
     @abc.abstractmethod
     def install_remote(self, path: str, clean: bool = False, flags: list = ["-r", "-t"]):
         pass
-    
+
     @abc.abstractmethod
     def remove(self, path: str):
         pass
