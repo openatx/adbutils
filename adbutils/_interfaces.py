@@ -12,7 +12,16 @@ from adbutils._proto import ShellReturn, ShellReturnRaw
 
 class AbstractShellDevice(abc.ABC):
     @abc.abstractmethod
-    def shell(self, cmd: Union[str, List[str]]) -> str:
+    def shell(self, cmdargs: Union[str, List[str]]) -> str:
+        pass
+
+    @abc.abstractmethod
+    def shell2(self, cmdargs: Union[str, List[str]]) -> ShellReturn:
+        """Run a command and return its output and exit code.
+
+        :param cmdargs: Command text or arguments.
+        :return: Shell command result.
+        """
         pass
 
     @property
@@ -56,7 +65,7 @@ class AbstractDevice(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def uninstall(self, package_name: str):
+    def uninstall(self, package_name: str, user_id: Optional[int] = None):
         pass
 
     @abc.abstractmethod
