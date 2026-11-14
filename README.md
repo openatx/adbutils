@@ -1,6 +1,7 @@
 # adbutils
 [![PyPI](https://img.shields.io/pypi/v/adbutils.svg?color=blue)](https://pypi.org/project/adbutils/#history)
-[![codecov](https://codecov.io/gh/openatx/adbutils/graph/badge.svg?token=OuGOMZUkmi)](https://codecov.io/gh/openatx/adbutils)
+
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 Python adb library for adb service
 
@@ -63,6 +64,11 @@ print(adb.device_list())
 # Set socket timeout to 10 (default None)
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=10)
 print(adb.device_list())
+
+# device_list/list also accept a per-call timeout. Without one they fall back
+# to socket_timeout, or 10 seconds, so an unresponsive server raises AdbTimeout
+# instead of blocking forever.
+print(adb.device_list(timeout=10))
 ```
 
 The above code can be short to `from adbutils import adb`
@@ -318,6 +324,9 @@ print(app_info.pid) # might be 0
 d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
 # raise AdbInstallError if something went wrong
+
+# install split apks (adb install-multiple)
+d.install_multiple(["base.apk", "split_config.arm64_v8a.apk", "split_config.xxhdpi.apk"])
 
 # simulate click
 d.click(100, 100)

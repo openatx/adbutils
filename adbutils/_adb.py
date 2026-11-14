@@ -64,6 +64,12 @@ def _retry_on_connection_error(func):
     return wrapper
 
 
+# Host services such as host:devices are expected to reply immediately. Without
+# a finite timeout a half-open connection or a non-adb service listening on the
+# configured port makes device_list() block forever.
+_DEFAULT_HOST_TIMEOUT = 10.0
+
+
 def _check_server(host: str, port: int) -> bool:
     """ Returns if server is running """
     s = socket.socket()
@@ -272,7 +278,11 @@ class BaseClient(object):
     @property
     def port(self) -> int:
         return self.__port
-        
+
+    @property
+    def socket_timeout(self) -> Optional[float]:
+        return self.__socket_timeout
+
     def make_connection(self, timeout: Optional[float] = None) -> AdbConnection:
         """ connect to adb server
         

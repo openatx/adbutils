@@ -27,7 +27,9 @@ jobs:
         python-version: ["3.8", "3.12"]
         include:
           - os: Ubuntu
-            image: ubuntu-latest
+            # ubuntu-latest moved to 26.04, which has no Python 3.8 builds.
+            # Pin an LTS image that still provides every supported Python.
+            image: ubuntu-24.04
       fail-fast: false
     steps:
     - uses: actions/checkout@v4
@@ -49,7 +51,4 @@ jobs:
       
     - name: Run tests with coverage
       run: |
-        pytest --cov=. --cov-report xml --cov-report term
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+        pytest --cov=. --cov-report term

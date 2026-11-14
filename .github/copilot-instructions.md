@@ -24,7 +24,7 @@ adbutils is a pure Python library for Android Debug Bridge (ADB) operations. It 
   - **NEVER CANCEL** - timeout after 10+ minutes if no devices available
   - **WARNING**: These tests can hang without devices connected - use Ctrl+C if needed
   - **RECOMMENDATION**: Skip E2E tests during development unless testing device-specific features
-- **Coverage**: `pytest --cov=. --cov-report xml --cov-report term` -- run tests with coverage
+- **Coverage**: `pytest --cov=. --cov-report term` -- run tests with coverage
 - **Import Test**: `python -c "import adbutils; adb = adbutils.AdbClient(); print('Success')"` -- verify basic functionality
 
 ### Development Workflow
