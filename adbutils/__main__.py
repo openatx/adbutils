@@ -310,7 +310,7 @@ def main():
         length = os.stat(local).st_size
         with open(local, "rb") as fd:
             r = ReadProgress(fd, length)
-            d.sync.push(r, remote, filesize=length)
+            d.sync.push(r, remote)
 
     elif args.pull:
         remote_path = args.pull
