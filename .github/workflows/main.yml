@@ -27,7 +27,9 @@ jobs:
         python-version: ["3.8", "3.12"]
         include:
           - os: Ubuntu
-            image: ubuntu-latest
+            # ubuntu-latest moved to 26.04, which has no Python 3.8 builds.
+            # Pin an LTS image that still provides every supported Python.
+            image: ubuntu-24.04
       fail-fast: false
     steps:
     - uses: actions/checkout@v4
