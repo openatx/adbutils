@@ -10,7 +10,7 @@ import typing
 from typing import Iterator, List, Optional, Union
 from deprecation import deprecated
 
-from adbutils._adb import AdbConnection
+from adbutils._adb import AdbConnection, _DEFAULT_HOST_TIMEOUT
 from adbutils._adb import BaseClient as _BaseClient
 from adbutils._device import AdbDevice, Sync
 from adbutils._proto import *
@@ -45,13 +45,19 @@ class AdbClient(_BaseClient):
               timeout: Optional[float] = None) -> Union[str, AdbConnection]:
         return self.device(serial).shell(command, stream=stream, timeout=timeout, encoding='utf-8')
 
-    def list(self, extended=False) -> List[AdbDeviceInfo]:
+    def list(self, extended=False, timeout: Optional[float] = None) -> List[AdbDeviceInfo]:
         """
+        Args:
+            extended (bool): include device tags
+            timeout (float): socket timeout, defaults to socket_timeout or 10s
+
         Returns:
             list of device info, including offline
         """
+        if timeout is None:
+            timeout = self.socket_timeout or _DEFAULT_HOST_TIMEOUT
         infos = []
-        with self.make_connection() as c:
+        with self.make_connection(timeout=timeout) as c:
             if extended:
                 c.send_command("host:devices-l")
             else:
@@ -73,18 +79,18 @@ class AdbClient(_BaseClient):
                 infos.append(AdbDeviceInfo(serial=parts[0], state=parts[1], tags=tags))
         return infos
 
-    def iter_device(self) -> Iterator[AdbDevice]:
+    def iter_device(self, timeout: Optional[float] = None) -> Iterator[AdbDevice]:
         """
         Returns:
             iter only AdbDevice with state:device
         """
-        for info in self.list():
+        for info in self.list(timeout=timeout):
             if info.state != "device":
                 continue
             yield AdbDevice(self, serial=info.serial)
 
-    def device_list(self) -> typing.List[AdbDevice]:
-        return list(self.iter_device())
+    def device_list(self, timeout: Optional[float] = None) -> typing.List[AdbDevice]:
+        return list(self.iter_device(timeout=timeout))
 
     def device(self,
                serial: Optional[str] = None,
