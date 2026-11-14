@@ -17,6 +17,7 @@ Python 3.8+
       * [连接 ADB Server](#连接-adb-server)
       * [列出所有设备并获取设备对象](#列出所有设备并获取设备对象)
       * [连接或断开远程设备](#连接或断开远程设备)
+      * [无线调试 (mDNS)](#无线调试-mdns)
       * [adb forward 与 adb reverse](#adb-forward-与-adb-reverse)
       * [与设备建立 socket 连接](#与设备建立-socket-连接)
       * [执行 shell 命令](#执行-shell-命令)
@@ -112,6 +113,35 @@ adb.disconnect("127.0.0.1:5555", raise_error=True) # if device is not present, A
 # wait-for-device
 adb.wait_for("127.0.0.1:5555", state="device") # wait for device online, state default value is "device"
 adb.wait_for("127.0.0.1:5555", state="disconnect") # wait device disconnect
+```
+
+## 无线调试 (mDNS)
+等同于 `adb mdns services` 与 `adb connect <instance>`。mDNS 发现由 adb server
+完成，adbutils 不再自带一套 DNS-SD 实现。
+
+需要支持 mDNS 的 platform-tools，且 adb server 未禁用 mDNS（不要设置
+`ADB_MDNS=0`）。系统没有 Bonjour 时，可用 `ADB_MDNS_OPENSCREEN=1` 启动 server。
+
+```python
+# 列出 mDNS 发现的设备，包含配对服务
+for service in adb.mdns_services():
+    print(service.instance_name, service.service_name, service.addr)
+    # adb-1234abcd-xyz _adb-tls-connect._tcp 192.168.1.2:6666
+
+# 连接所有已配对好的无线调试设备
+for service in adb.connect_mdns():
+    print("connected:", service.serial)
+    # connected: adb-1234abcd-xyz._adb-tls-connect._tcp
+```
+
+`connect_mdns()` 用 mDNS instance 名连接，serial 与 adb mDNS 自动连接一致。
+仍需 `adb pair` 的设备会连接失败并被跳过（暂不实现配对）。
+
+命令行：
+
+```bash
+python -m adbutils --mdns
+python -m adbutils --connect-mdns
 ```
 
 ## adb forward 与 adb reverse
