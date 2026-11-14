@@ -8,10 +8,38 @@ import asyncio
 import functools
 import logging
 import re
+import socket
 import struct
 from typing import Union, Callable, overload
 
 logger = logging.getLogger(__name__)
+
+# Tests set a count here to make the mock server kill the connection instead of
+# answering a command, simulating an adb server restarted by another process.
+# The count is decremented per dropped connection, so it can be set to 1 for a
+# single recoverable reset or to a larger value to verify retries are bounded.
+RESET_COUNTERS: dict[str, int] = {}
+
+
+def reset_once(command: str) -> bool:
+    remaining = RESET_COUNTERS.get(command, 0)
+    if remaining <= 0:
+        return False
+    RESET_COUNTERS[command] = remaining - 1
+    return True
+
+
+def abort_connection(writer: asyncio.StreamWriter) -> None:
+    """Drop the peer with a TCP RST, like a killed adb server would."""
+    sock = writer.get_extra_info("socket")
+    if sock is not None:
+        try:
+            sock.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+        except OSError:
+            pass
+    writer.transport.abort()
 
 
 @overload
@@ -78,8 +106,11 @@ class Context:
         return (await self.recv(length)).decode()
     
     async def close(self):
-        self.writer.close()
-        await self.writer.wait_closed()
+        try:
+            self.writer.close()
+            await self.writer.wait_closed()
+        except (ConnectionError, OSError):
+            pass
 
     async def send_shell_v2(self, stream_id: int, payload: bytes):
         header = bytes([stream_id]) + len(payload).to_bytes(4, "little")
@@ -103,6 +134,25 @@ async def host_kill(ctx: Context):
 async def host_list_forward(ctx: Context):
     await ctx.send(b"OKAY")
     await ctx.send(encode_string("123456 tcp:1234 tcp:4321"))
+
+@register_command("host:track-devices")
+async def host_track_devices(ctx: Context):
+    await ctx.send(b"OKAY")
+    ctx.server.track_attempts += 1
+    if ctx.server.track_attempts == 1:
+        # Reset after the first block so the client has to replay the whole
+        # host:track-devices request on a new connection.
+        await ctx.send(encode_string("dummydevice\tdevice\n"))
+        abort_connection(ctx.writer)
+        return
+    # adb sends the complete device list on every change, so a newly attached
+    # device arrives in the same block as the existing one.
+    await ctx.send(encode_string("dummydevice\tdevice\notherdevice\tdevice\n"))
+    try:
+        while await ctx.recv(1024):
+            pass
+    except (ConnectionError, OSError):
+        pass
 
 @register_command(re.compile("host-serial:[0-9]*:features.*"))
 async def host_serial_features(ctx: Context):
@@ -175,6 +225,9 @@ async def host_tport_serial(ctx: Context):
 
     cmd = await ctx.recv_string_block()
     logger.info("recv shell cmd: %s", cmd)
+    if reset_once(cmd):
+        abort_connection(ctx.writer)
+        return
     if cmd.startswith("shell,v2:"):
         await ctx.send(b"OKAY")
         shell_cmd = cmd.split(":", 1)[1]
@@ -194,6 +247,17 @@ async def host_tport_serial(ctx: Context):
     elif cmd.startswith("shell:"):
         await ctx.send(b"OKAY")
         shell_cmd = cmd.split(":", 1)[1]
+        if shell_cmd == "reset-after-output":
+            # Reset while the client is reading the stream. Regression test for
+            # a reconnect that used to block forever waiting for a reply.
+            await ctx.send(b"partial output")
+            abort_connection(ctx.writer)
+            return
+        if shell_cmd == "hang":
+            # Keep the service open without sending anything so the client has
+            # to rely on its configured socket timeout.
+            await ctx.recv(1024)
+            return
         if shell_cmd in SHELL_OUTPUTS:
             await ctx.send((SHELL_OUTPUTS[shell_cmd].rstrip() + "\n").encode())
         elif shell_cmd in SHELL_DEBUGS:
@@ -201,6 +265,16 @@ async def host_tport_serial(ctx: Context):
             await ctx.send(b"debug command executed")
         else:
             await ctx.send(b"unknown command")
+    elif cmd.startswith("sync:"):
+        await ctx.send(b"OKAY")
+        # Consume the {COMMAND}{LittleEndianPathLength}{Path} request and drop
+        # the connection, as a restarted adb server would.
+        header = await ctx.recv(8)
+        if len(header) == 8:
+            path_len = int.from_bytes(header[4:8], "little")
+            await ctx.recv(path_len)
+        abort_connection(ctx.writer)
+        return
     else:
         await ctx.send(b"FAIL")
         await ctx.send(encode("unsupported command"))
@@ -214,6 +288,9 @@ async def handle_command(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         cmd_length = int((await reader.readexactly(4)).decode(), 16)
         command = (await reader.read(cmd_length)).decode()
         logger.info("recv command: %s", command)
+        if reset_once(command):
+            abort_connection(writer)
+            return
         command_handler: callable = None
         command_keys = list(COMMANDS.keys())
         logger.debug("command_keys: %s", command_keys)
@@ -245,6 +322,7 @@ class AdbServer:
         self.port = port
         self.host = host
         self.server = None
+        self.track_attempts = 0
     
     async def start(self):
         _handle = functools.partial(handle_command, server=self)
