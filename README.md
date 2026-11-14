@@ -324,6 +324,9 @@ d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
 # raise AdbInstallError if something went wrong
 
+# install split apks (adb install-multiple)
+d.install_multiple(["base.apk", "split_config.arm64_v8a.apk", "split_config.xxhdpi.apk"])
+
 # simulate click
 d.click(100, 100)
 d.click(0.5, 0.5) # center, should be float and <= 1.0

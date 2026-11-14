@@ -167,6 +167,57 @@ class InstallExtension(AbstractDevice):
             if callback:
                 callback("FINALLY")
 
+    def install_multiple(self,
+                         apk_paths: typing.List[Union[str, Path]],
+                         silent: bool = False,
+                         flags: list = ["-r", "-t"]):
+        """Install a split APK set with ``pm install-multiple``.
+
+        Args:
+            apk_paths: local paths of the APKs, base APK first
+            silent: disable log message print
+            flags (list): default ["-r", "-t"]
+
+        Raises:
+            ValueError: when apk_paths is empty
+            FileNotFoundError: when one of the local files is missing
+            AdbInstallError: when the device does not report Success
+        """
+        if not apk_paths:
+            raise ValueError("apk_paths must not be empty")
+
+        # A split set has no single main activity, so unlike install() this
+        # never parses the package or launches the app.
+
+        def dprint(msg):
+            if not silent:
+                print(msg)
+
+        remote_paths = []
+        try:
+            for path in apk_paths:
+                src_path = Path(path)
+                if not src_path.is_file():
+                    raise FileNotFoundError(f"File not found: {path}")
+                # Keep the original filename: split APKs must stay distinguishable.
+                device_dst = f"/data/local/tmp/{src_path.name}"
+                dprint(f"push apk to device: {device_dst}")
+                self._push_apk(src_path, device_dst, show_progress=not silent)
+                remote_paths.append(device_dst)
+
+            dprint("install multiple apks to android system ...")
+            output = self.shell(["pm", "install-multiple"] + flags + remote_paths)
+            if "Success" not in output:
+                raise AdbInstallError(output)
+            dprint("successfully installed")
+        finally:
+            # Clean up even when the install fails, so /data/local/tmp stays clean.
+            for remote_path in remote_paths:
+                try:
+                    self.shell(["rm", remote_path])
+                except Exception as e:
+                    logger.warning("failed to remove %s: %s", remote_path, e)
+
     def _push_apk(self, apk_path: Path, device_dst: str, show_progress: bool = True):
         """
         Push APK file to device with progress indication.
