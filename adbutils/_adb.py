@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import functools
 import io
+import logging
 import os
 import platform
 import socket
@@ -24,6 +26,42 @@ from adbutils._version import __version__
 
 _OKAY = b"OKAY"
 _FAIL = b"FAIL"
+
+# A lost connection can only be recovered by replaying the complete adb
+# request, not the individual socket operation: the transport selected with
+# host:transport / host:tport lives on the socket that just died. Keep the
+# number of replays small so a server that keeps accepting and resetting
+# cannot turn one call into an endless reconnect loop.
+_MAX_COMMAND_RETRIES = 1
+
+logger = logging.getLogger(__name__)
+
+
+def _retry_on_connection_error(func):
+    """Replay an idempotent adb command once after the server was restarted.
+
+    Only apply this to methods that build their complete request from scratch,
+    so the retry also re-sends the transport/service selection.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        attempt = 0
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except AdbConnectionError:
+                if attempt >= _MAX_COMMAND_RETRIES:
+                    raise
+                attempt += 1
+                logger.warning(
+                    "adb connection lost, retrying %s (%d/%d)",
+                    func.__name__,
+                    attempt,
+                    _MAX_COMMAND_RETRIES,
+                )
+
+    return wrapper
 
 
 def _check_server(host: str, port: int) -> bool:
@@ -100,14 +138,6 @@ class AdbConnection(object):
         self.__conn.close() # 真正释放资源
         self.__conn = None
 
-    def reconnect(self):
-        """ Close current connection and create a new one """
-        try:
-            self.close()
-        except Exception:
-            pass
-        self.__conn = self._safe_connect()
-
     def __enter__(self):
         return self
 
@@ -124,9 +154,13 @@ class AdbConnection(object):
         """ alias of conn.send(data) """
         try:
             return self.conn.send(data)
-        except ConnectionResetError:
-            self.reconnect()
-            return self.conn.send(data)
+        except socket.timeout:
+            raise AdbTimeout("adb send timeout")
+        except ConnectionError as e:
+            # ConnectionResetError, BrokenPipeError and ConnectionAbortedError
+            # depending on the platform; callers only need to know the adb
+            # connection is gone.
+            raise AdbConnectionError("adb send failed: %s" % e) from e
 
     def recv(self, n: int) -> bytes:
         """ alias of conn.recv(n) """
@@ -134,6 +168,8 @@ class AdbConnection(object):
             return self.conn.recv(n)
         except socket.timeout:
             raise AdbTimeout("adb recv timeout")
+        except ConnectionError as e:
+            raise AdbConnectionError("adb recv failed: %s" % e) from e
 
     def read(self, n: int) -> bytes:
         try:
@@ -149,11 +185,7 @@ class AdbConnection(object):
         t = n
         buffer = b''
         while t > 0:
-            try:
-                chunk = self.conn.recv(t)
-            except ConnectionResetError:
-                self.reconnect()
-                return self._read_fully(n)
+            chunk = self.recv(t)
             if not chunk:
                 break
             buffer += chunk
@@ -166,7 +198,7 @@ class AdbConnection(object):
         except socket.timeout:
             raise AdbTimeout("adb read timeout")
         if len(data) < n:
-            raise EOFError(f"Expected {n} bytes, got {len(data)}")
+            raise AdbConnectionError(f"Expected {n} bytes, got {len(data)}")
         return data
 
     def send_command(self, cmd: str):
@@ -184,7 +216,7 @@ class AdbConnection(object):
         """
         length = self.read_string(4)
         if not length:
-            raise AdbError("connection closed")
+            raise AdbConnectionError("connection closed")
         size = int(length, 16)
         return self.read_string(size)
 
@@ -207,6 +239,9 @@ class AdbConnection(object):
             raise AdbError(self.read_string_block())
         elif data == _OKAY:
             return
+        if not data:
+            # EOF before a reply means the adb server was restarted or killed.
+            raise AdbConnectionError("connection closed")
         raise AdbError("Unknown data: %r" % data)
 
 
@@ -253,6 +288,7 @@ class BaseClient(object):
         except TimeoutError:
             raise AdbTimeout("connect to adb server timeout")
 
+    @_retry_on_connection_error
     def server_version(self):
         """ 40 will match 1.0.40
         Returns:
@@ -362,16 +398,38 @@ class BaseClient(object):
             AdbError when adb-server was killed
         """
         orig_devices = []
-
-        with self.make_connection() as c:
-            c.send_command("host:track-devices")
-            c.check_okay()
+        attempts = 0
+        c: Optional[AdbConnection] = None
+        try:
             while True:
-                output = c.read_string_block()
+                try:
+                    if c is None:
+                        c = self.make_connection()
+                        c.send_command("host:track-devices")
+                        c.check_okay()
+                    output = c.read_string_block()
+                except AdbConnectionError:
+                    if c is not None:
+                        c.close()
+                        c = None
+                    if attempts >= _MAX_COMMAND_RETRIES:
+                        raise
+                    attempts += 1
+                    logger.warning(
+                        "adb connection lost, reconnecting track_devices (%d/%d)",
+                        attempts,
+                        _MAX_COMMAND_RETRIES,
+                    )
+                    continue
+                # A successful read means the new connection is healthy again.
+                attempts = 0
                 curr_devices = self._output2devices(output)
                 for event in self._diff_devices(orig_devices, curr_devices):
                     yield event
                 orig_devices = curr_devices
+        finally:
+            if c is not None:
+                c.close()
 
     def _output2devices(self, output: str):
         devices = []
@@ -389,6 +447,7 @@ class BaseClient(object):
         for d in set(curr).difference(orig):
             yield DeviceEvent(True, d.serial, d.status)
 
+    @_retry_on_connection_error
     def forward_list(self, serial: Union[None, str] = None) -> List[ForwardItem]:
         with self.make_connection() as c:
             list_cmd = "host:list-forward"
@@ -450,6 +509,7 @@ class BaseClient(object):
                 removed_in="1.0.0",
                 details="use Device.reverse_list instead",
                 current_version=__version__)
+    @_retry_on_connection_error
     def reverse_list(self, serial: str) -> List[ReverseItem]:
         with self.make_connection() as c:
             c.send_command("host:transport:" + serial)

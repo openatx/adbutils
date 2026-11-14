@@ -185,7 +185,7 @@ class _ScrcpyJarScreenrecord:
         _c = self._d.shell(cmd, stream=True)
         c: AdbConnection = _c
         del _c
-        message = c.conn.recv(100).decode("utf-8")
+        message = c.recv(100).decode("utf-8")
         print("Scrcpy:", message)
         self._conn = c
         threading.Thread(
