@@ -16,7 +16,7 @@ Python 3.8+
    * [用法](#用法)
       * [连接 ADB Server](#连接-adb-server)
       * [列出所有设备并获取设备对象](#列出所有设备并获取设备对象)
-      * [连接远程设备](#连接远程设备)
+      * [连接或断开远程设备](#连接或断开远程设备)
       * [adb forward 与 adb reverse](#adb-forward-与-adb-reverse)
       * [与设备建立 socket 连接](#与设备建立-socket-连接)
       * [执行 shell 命令](#执行-shell-命令)
