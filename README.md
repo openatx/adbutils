@@ -1,6 +1,7 @@
 # adbutils
 [![PyPI](https://img.shields.io/pypi/v/adbutils.svg?color=blue)](https://pypi.org/project/adbutils/#history)
-[![codecov](https://codecov.io/gh/openatx/adbutils/graph/badge.svg?token=OuGOMZUkmi)](https://codecov.io/gh/openatx/adbutils)
+
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 Python adb library for adb service
 
