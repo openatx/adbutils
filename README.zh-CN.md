@@ -323,6 +323,8 @@ print(app_info.pid) # might be 0
 # install apk
 d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
+# 额外参数会直接追加到 "pm install"（默认 ["-r", "-t"]）
+d.install("apidemo.apk", flags=["-r", "-t", "-d"])
 # raise AdbInstallError if something went wrong
 
 # install split apks (adb install-multiple)
