@@ -5,7 +5,7 @@ from __future__ import annotations
 
 __all__ = [
     "Network", "BrightnessMode", "DeviceEvent", "ForwardItem", "ReverseItem", "FileInfo",
-    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AppInfo", "BatteryInfo", "RunningAppInfo"
+    "WindowSize", "RunningAppInfo", "ShellReturn", "AdbDeviceInfo", "AdbMdnsService", "AppInfo", "BatteryInfo", "RunningAppInfo"
 ]
 
 import enum
@@ -131,6 +131,28 @@ class AdbDeviceInfo:
     def transport_id(self) -> Optional[int]:
         """Get the transport ID from tags."""
         return int(self.tags.get("transport_id", 0)) if "transport_id" in self.tags else None
+
+
+@dataclass(frozen=True)
+class AdbMdnsService:
+    """Device advertised by adb server through mDNS (adb mdns services)
+
+    service_name is the DNS-SD type without the trailing dot, eg
+    "_adb-tls-connect._tcp".
+    """
+    instance_name: str
+    service_name: str
+    addr: str
+
+    @property
+    def serial(self) -> str:
+        """Serial adb server reports once the device is connected
+
+        Wireless debugging devices are named "<instance>.<service>", which is
+        exactly the serial mDNS auto-connect produces, eg
+        adb-1234abcd-xyz._adb-tls-connect._tcp
+        """
+        return f"{self.instance_name}.{self.service_name}"
 
 
 StrOrPathLike = Union[str, pathlib.Path]

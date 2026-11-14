@@ -87,6 +87,24 @@ def register_command(name: Union[str, re.Pattern]):
     return wrapper
 
 
+# mDNS state shared with tests. host:mdns:services replies with MDNS_SERVICES
+# (raw TAB separated lines) unless MDNS_ERROR is set; host:connect replies with
+# MDNS_CONNECT[target], defaulting to a successful "connected to" response, and
+# records every requested target in MDNS_CONNECTED.
+MDNS_SERVICES: list[str] = []
+MDNS_ERROR = ""
+MDNS_CONNECT: dict[str, str] = {}
+MDNS_CONNECTED: list[str] = []
+
+
+def reset_mdns_state():
+    MDNS_SERVICES.clear()
+    MDNS_CONNECT.clear()
+    MDNS_CONNECTED.clear()
+    global MDNS_ERROR
+    MDNS_ERROR = ""
+
+
 class Context:
     def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, server: "AdbServer" = None, command: str = None):
         self.reader = reader
@@ -158,6 +176,23 @@ async def host_track_devices(ctx: Context):
 async def host_serial_features(ctx: Context):
     await ctx.send(b"OKAY")
     await ctx.send(encode_string("shell_v2,fake_feature"))
+
+
+@register_command("host:mdns:services")
+async def host_mdns_services(ctx: Context):
+    await ctx.send(b"OKAY")
+    if MDNS_ERROR:
+        await ctx.send(encode_string(MDNS_ERROR))
+        return
+    await ctx.send(encode_string("".join(line + "\n" for line in MDNS_SERVICES)))
+
+
+@register_command(re.compile("host:connect:.*"))
+async def host_connect(ctx: Context):
+    target = ctx.command.split(":", 2)[2]
+    MDNS_CONNECTED.append(target)
+    await ctx.send(b"OKAY")
+    await ctx.send(encode_string(MDNS_CONNECT.get(target, "connected to " + target)))
 
 
 def enable_devices():
