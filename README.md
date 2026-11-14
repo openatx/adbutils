@@ -63,6 +63,11 @@ print(adb.device_list())
 # Set socket timeout to 10 (default None)
 adb = adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=10)
 print(adb.device_list())
+
+# device_list/list also accept a per-call timeout. Without one they fall back
+# to socket_timeout, or 10 seconds, so an unresponsive server raises AdbTimeout
+# instead of blocking forever.
+print(adb.device_list(timeout=10))
 ```
 
 The above code can be short to `from adbutils import adb`
