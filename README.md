@@ -226,6 +226,9 @@ serial = d.shell("getprop ro.serial")
 # Set timeout for shell command
 d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
 
+# Binary safe output, no pty on the device side (like adb exec-out)
+png_data = d.exec_out("screencap -p")
+
 # Open shell as connection
 c = d.open_shell('cat') # AdbConnection, use c.conn to get socket.socket object
 c.send(b'hello\n')
@@ -267,8 +270,8 @@ except AdbError:
     print("failed to takeScreenshot")
 
 # Method 2
-# adb exec-out screencap -p p.png
-png_data = d.shell("screencap -p", encoding=None)
+# same as: adb exec-out screencap -p > p.png
+png_data = d.exec_out("screencap -p")
 pathlib.Path("p.png").write_bytes(png_data)
 ```
 

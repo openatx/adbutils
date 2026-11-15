@@ -194,6 +194,38 @@ SHELL_OUTPUTS = {
     "pwd; echo X4EXIT:$?": "/\nX4EXIT:0"
 }
 
+
+def _make_png(width: int = 3, height: int = 2) -> bytes:
+    import io
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), (255, 0, 0)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+SCREENCAP_PNG_SIZE = (3, 2)
+SCREENCAP_PNG = _make_png(*SCREENCAP_PNG_SIZE)
+
+# Newer devices write this warning to stdout (unless -d is given) before the
+# png itself, which is what broke PIL on multi-display emulators.
+SCREENCAP_WARNING = (
+    b"[Warning] Multiple displays were found, but no display id was specified! "
+    b"Defaulting to the first display found, however this default is not "
+    b"guaranteed to be consistent across captures. A display id should be specified.\n"
+    b"A display ID can be specified with the [-d display-id] option.\n"
+    b'See "dumpsys SurfaceFlinger --display-id" for valid display IDs.\n'
+)
+
+# Payloads served by the exec: service, keyed by the command adb sends.
+# "raw-bytes" contains LF and NUL bytes: a pty would rewrite them, exec: must
+# return them unchanged.
+EXEC_OUTPUTS = {
+    "screencap -p": SCREENCAP_WARNING + SCREENCAP_PNG,
+    "raw-bytes": b"line1\nline2\r\n\x00\x01\xff",
+    "empty": b"",
+}
+
 SHELL_V2_COMMANDS = {
     "v2-stdout-only": {
         "stdout": b"this is stdout\n",
@@ -265,6 +297,18 @@ async def host_tport_serial(ctx: Context):
             await ctx.send(b"debug command executed")
         else:
             await ctx.send(b"unknown command")
+    elif cmd.startswith("exec:"):
+        exec_cmd = cmd.split(":", 1)[1]
+        payload = EXEC_OUTPUTS.get(exec_cmd)
+        if payload is None:
+            # An adb server without exec-out support fails before OKAY, which
+            # is what makes adbutils fall back to screencap + pull.
+            await ctx.send(b"FAIL")
+            await ctx.send(encode("unknown service: exec"))
+            return
+        await ctx.send(b"OKAY")
+        if payload:
+            await ctx.send(payload)
     elif cmd.startswith("sync:"):
         await ctx.send(b"OKAY")
         # Consume the {COMMAND}{LittleEndianPathLength}{Path} request and drop
