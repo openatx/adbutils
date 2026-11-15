@@ -69,6 +69,10 @@ def _retry_on_connection_error(func):
 # configured port makes device_list() block forever.
 _DEFAULT_HOST_TIMEOUT = 10.0
 
+# Wireless debugging devices register this DNS-SD type. _adb-tls-pairing devices
+# must be paired first, so they are excluded from connect_mdns().
+_MDNS_CONNECT_SERVICE = "_adb-tls-connect._tcp"
+
 
 def _check_server(host: str, port: int) -> bool:
     """ Returns if server is running """
@@ -393,6 +397,85 @@ class BaseClient(object):
         except AdbError:
             if raise_error:
                 raise
+
+    @_retry_on_connection_error
+    def mdns_services(self, timeout: Optional[float] = None) -> List[AdbMdnsService]:
+        """ adb mdns services
+
+        Args:
+            timeout (float): socket timeout, defaults to socket_timeout or 10s
+
+        Returns:
+            services advertised through the adb server's mDNS backend, including
+            pairing and connect types
+
+        Raises:
+            AdbError: mDNS discovery is disabled or the server is too old to
+                support host:mdns:services
+        """
+        if timeout is None:
+            timeout = self.socket_timeout or _DEFAULT_HOST_TIMEOUT
+        with self.make_connection(timeout=timeout) as c:
+            c.send_command("host:mdns:services")
+            c.check_okay()
+            output = c.read_string_block()
+        # An adb server without a working mDNS backend still replies OKAY, but
+        # the payload is "ERROR: mdns daemon unavailable" instead of a list.
+        if output.lstrip().startswith("ERROR:"):
+            raise AdbError(output.strip())
+        services = []
+        for line in output.splitlines():
+            # Fields are TAB separated: instance, service type, ip:port. The
+            # service type keeps its DNS-SD trailing dot ("_adb-tls-connect._tcp.")
+            fields = line.split("\t")
+            if len(fields) != 3:
+                continue
+            instance_name, service_name, addr = [field.strip() for field in fields]
+            if not instance_name or not service_name or not addr:
+                continue
+            services.append(
+                AdbMdnsService(
+                    instance_name=instance_name,
+                    service_name=service_name.rstrip("."),
+                    addr=addr,
+                ))
+        return services
+
+    def connect_mdns(self, timeout: Optional[float] = None) -> List[AdbMdnsService]:
+        """ Connect all wireless debugging devices advertised through mDNS
+
+        Same as `adb connect <instance>` for every _adb-tls-connect._tcp service.
+        Connecting by instance name (instead of ip:port) keeps the device serial
+        identical to the one mDNS auto-connect creates, so one device never shows
+        up as both ip:port and mDNS transport. Pairing is not handled here: a
+        device that still needs `adb pair` fails to connect and is skipped.
+
+        Args:
+            timeout (float): socket timeout for both listing and connecting
+
+        Returns:
+            the services that are connected now
+
+        Raises:
+            AdbError: mDNS discovery is disabled or the server is too old to
+                support host:mdns:services
+        """
+        connected: List[AdbMdnsService] = []
+        for service in self.mdns_services(timeout=timeout):
+            if service.service_name != _MDNS_CONNECT_SERVICE:
+                continue
+            try:
+                output = self.connect(service.instance_name, timeout=timeout)
+            except AdbTimeout as e:
+                # One unreachable device must not hide the others.
+                logger.warning("connect mdns %s timeout: %s", service.instance_name, e)
+                continue
+            if not output.startswith(("connected to ", "already connected to ")):
+                logger.info("connect mdns %s failed: %s", service.instance_name, output)
+                continue
+            if service not in connected:
+                connected.append(service)
+        return connected
 
     def track_devices(self) -> Iterator[DeviceEvent]:
         """

@@ -17,6 +17,7 @@ Python 3.8+
       * [Connect ADB Server](#connect-adb-server)
       * [List all the devices and get device object](#list-all-the-devices-and-get-device-object)
       * [Connect remote device](#connect-remote-device)
+      * [Wireless debugging (mDNS)](#wireless-debugging-mdns)
       * [adb forward and adb reverse](#adb-forward-and-adb-reverse)
       * [Create socket connection to the device](#create-socket-connection-to-the-device)
       * [Run shell command](#run-shell-command)
@@ -112,6 +113,38 @@ adb.disconnect("127.0.0.1:5555", raise_error=True) # if device is not present, A
 # wait-for-device
 adb.wait_for("127.0.0.1:5555", state="device") # wait for device online, state default value is "device"
 adb.wait_for("127.0.0.1:5555", state="disconnect") # wait device disconnect
+```
+
+## Wireless debugging (mDNS)
+Same as `adb mdns services` and `adb connect <instance>`. The adb server already
+does mDNS discovery, so adbutils only asks the server instead of running its own
+DNS-SD stack.
+
+Requires platform-tools with mDNS support and a server that has not disabled it
+(do not set `ADB_MDNS=0`). On machines without Bonjour, start the server with
+`ADB_MDNS_OPENSCREEN=1`.
+
+```python
+# list devices advertised through mDNS, pairing services included
+for service in adb.mdns_services():
+    print(service.instance_name, service.service_name, service.addr)
+    # adb-1234abcd-xyz _adb-tls-connect._tcp 192.168.1.2:6666
+
+# connect every wireless debugging device that has been paired already
+for service in adb.connect_mdns():
+    print("connected:", service.serial)
+    # connected: adb-1234abcd-xyz._adb-tls-connect._tcp
+```
+
+`connect_mdns()` connects by mDNS instance name, so the serial is the one adb
+mDNS auto-connect would create. Devices that still need `adb pair` fail to
+connect and are skipped (pairing itself is not implemented).
+
+Command line:
+
+```bash
+python -m adbutils --mdns
+python -m adbutils --connect-mdns
 ```
 
 ## adb forward and adb reverse
