@@ -264,6 +264,41 @@ class BaseDevice:
             return output.rstrip() if rstrip else output
         return output
 
+    def exec_out(
+        self,
+        cmdargs: Union[str, list, tuple],
+        timeout: Optional[float] = _DEFAULT_SOCKET_TIMEOUT,
+    ) -> bytes:
+        """Run a command on the device and return its raw stdout bytes
+
+        Unlike shell(), this uses adb's exec: service, which is not backed by
+        a pty, so binary output such as `screencap -p` is passed through
+        untouched. A pty rewrites LF bytes inside a png, which is why
+        screenshots must not go through shell().
+
+        Args:
+            cmdargs (str | list | tuple): command args, must not be empty
+            timeout (float): socket timeout, seconds
+
+        Returns:
+            bytes of stdout
+
+        Raises:
+            AdbError: when exec: is not supported by the adb server or device
+            AdbTimeout
+        """
+        if isinstance(cmdargs, (list, tuple)):
+            cmdargs = list2cmdline(cmdargs)
+        if not cmdargs:
+            raise ValueError("cmdargs must not be empty")
+        c = self.open_transport(timeout=timeout)
+        try:
+            c.send_command("exec:" + cmdargs)
+            c.check_okay()
+            return typing.cast(bytes, c.read_until_close(encoding=None))
+        finally:
+            c.close()
+
     @overload
     def shell2(
         self,
