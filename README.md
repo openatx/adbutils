@@ -17,6 +17,7 @@ Python 3.8+
       * [Connect ADB Server](#connect-adb-server)
       * [List all the devices and get device object](#list-all-the-devices-and-get-device-object)
       * [Connect remote device](#connect-remote-device)
+      * [Wireless debugging (mDNS)](#wireless-debugging-mdns)
       * [adb forward and adb reverse](#adb-forward-and-adb-reverse)
       * [Create socket connection to the device](#create-socket-connection-to-the-device)
       * [Run shell command](#run-shell-command)
@@ -112,6 +113,38 @@ adb.disconnect("127.0.0.1:5555", raise_error=True) # if device is not present, A
 # wait-for-device
 adb.wait_for("127.0.0.1:5555", state="device") # wait for device online, state default value is "device"
 adb.wait_for("127.0.0.1:5555", state="disconnect") # wait device disconnect
+```
+
+## Wireless debugging (mDNS)
+Same as `adb mdns services` and `adb connect <instance>`. The adb server already
+does mDNS discovery, so adbutils only asks the server instead of running its own
+DNS-SD stack.
+
+Requires platform-tools with mDNS support and a server that has not disabled it
+(do not set `ADB_MDNS=0`). On machines without Bonjour, start the server with
+`ADB_MDNS_OPENSCREEN=1`.
+
+```python
+# list devices advertised through mDNS, pairing services included
+for service in adb.mdns_services():
+    print(service.instance_name, service.service_name, service.addr)
+    # adb-1234abcd-xyz _adb-tls-connect._tcp 192.168.1.2:6666
+
+# connect every wireless debugging device that has been paired already
+for service in adb.connect_mdns():
+    print("connected:", service.serial)
+    # connected: adb-1234abcd-xyz._adb-tls-connect._tcp
+```
+
+`connect_mdns()` connects by mDNS instance name, so the serial is the one adb
+mDNS auto-connect would create. Devices that still need `adb pair` fail to
+connect and are skipped (pairing itself is not implemented).
+
+Command line:
+
+```bash
+python -m adbutils --mdns
+python -m adbutils --connect-mdns
 ```
 
 ## adb forward and adb reverse
@@ -226,6 +259,9 @@ serial = d.shell("getprop ro.serial")
 # Set timeout for shell command
 d.shell("sleep 1", timeout=0.5) # Should raise adbutils.AdbTimeout
 
+# Binary safe output, no pty on the device side (like adb exec-out)
+png_data = d.exec_out("screencap -p")
+
 # Open shell as connection
 c = d.open_shell('cat') # AdbConnection, use c.conn to get socket.socket object
 c.send(b'hello\n')
@@ -267,8 +303,8 @@ except AdbError:
     print("failed to takeScreenshot")
 
 # Method 2
-# adb exec-out screencap -p p.png
-png_data = d.shell("screencap -p", encoding=None)
+# same as: adb exec-out screencap -p > p.png
+png_data = d.exec_out("screencap -p")
 pathlib.Path("p.png").write_bytes(png_data)
 ```
 
@@ -323,6 +359,8 @@ print(app_info.pid) # might be 0
 # install apk
 d.install("apidemo.apk") # use local path
 d.install("http://example.com/apidemo.apk") # install from url
+# pass extra flags to "pm install" directly (default: ["-r", "-t"])
+d.install("apidemo.apk", flags=["-r", "-t", "-d"])
 # raise AdbInstallError if something went wrong
 
 # install split apks (adb install-multiple)

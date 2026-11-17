@@ -41,7 +41,7 @@ class Sync():
             c.check_okay()
             # {COMMAND}{LittleEndianPathLength}{Path}
             path_len = len(path.encode('utf-8'))
-            c.conn.send(
+            c.send(
                 cmd.encode("utf-8") + struct.pack("<I", path_len) +
                 path.encode("utf-8"))
             yield c
@@ -53,7 +53,7 @@ class Sync():
     def stat(self, path: str) -> FileInfo:
         with self._prepare_sync(path, "STAT") as c:
             assert "STAT" == c.read_string(4)
-            mode, size, mtime = struct.unpack("<III", c.conn.recv(12))
+            mode, size, mtime = struct.unpack("<III", c.recv(12))
             # when mtime is 0, windows will error
             mdtime = datetime.datetime.fromtimestamp(mtime) if mtime else None
             return FileInfo(mode, size, mdtime, path)
@@ -65,7 +65,7 @@ class Sync():
                 if response == _DONE:
                     break
                 mode, size, mtime, namelen = struct.unpack(
-                    "<IIII", c.conn.recv(16))
+                    "<IIII", c.recv(16))
                 name = c.read_string(namelen)
                 try:
                     mtime = datetime.datetime.fromtimestamp(mtime)
@@ -129,10 +129,10 @@ class Sync():
                     chunk = r.read(4096) # should not >64k
                     if not chunk:
                         mtime = int(datetime.datetime.now().timestamp())
-                        c.conn.send(b"DONE" + struct.pack("<I", mtime))
+                        c.send(b"DONE" + struct.pack("<I", mtime))
                         break
-                    c.conn.send(b"DATA" + struct.pack("<I", len(chunk)))
-                    c.conn.send(chunk)
+                    c.send(b"DATA" + struct.pack("<I", len(chunk)))
+                    c.send(chunk)
                     total_size += len(chunk)
                 status_msg = c.read_string(4)
                 if status_msg != _OKAY:

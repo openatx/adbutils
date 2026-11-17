@@ -121,6 +121,12 @@ def main():
                         help="show package info in json format")
     parser.add_argument("--grep", help="filter matched package names")
     parser.add_argument("--connect", type=str, help="connect remote device")
+    parser.add_argument("--mdns",
+                        action="store_true",
+                        help="list devices discovered with mDNS")
+    parser.add_argument("--connect-mdns",
+                        action="store_true",
+                        help="connect all devices discovered with mDNS")
     parser.add_argument("--shell",
                         action="store_true",
                         help="run shell command")
@@ -146,6 +152,17 @@ def main():
 
     if args.connect:
         adbclient.connect(args.connect)
+        return
+
+    if args.mdns:
+        for service in adbclient.mdns_services():
+            print("{}\t{}\t{}".format(service.instance_name, service.service_name,
+                                     service.addr))
+        return
+
+    if args.connect_mdns:
+        for service in adbclient.connect_mdns():
+            print("connected to {}".format(service.serial))
         return
 
     if args.server_version:
