@@ -104,18 +104,24 @@ class InstallExtension(AbstractDevice):
         main_activity = None
         
         if has_apkutils:
-            import apkutils
-            with apkutils.APK.from_file(str(src_path)) as apk:
-                apk.get_manifest()
-                activities = apk.get_manifest_main_activities()
-                package_name = apk.package_name
-                
-                main_activity = activities[0] if activities else None
-                if main_activity and main_activity.find(".") == -1:
-                    main_activity = "." + main_activity
-            
-            dprint(f"APK packageName: {package_name}")
-            dprint(f"APK mainActivity: {main_activity}")
+            try:
+                import apkutils
+                with apkutils.APK.from_file(str(src_path)) as apk:
+                    apk.get_manifest()
+                    activities = apk.get_manifest_main_activities()
+                    package_name = apk.package_name
+
+                    main_activity = activities[0] if activities else None
+                    if main_activity and main_activity.find(".") == -1:
+                        main_activity = "." + main_activity
+
+                dprint(f"APK packageName: {package_name}")
+                dprint(f"APK mainActivity: {main_activity}")
+            except Exception as e:
+                # Manifest metadata is optional; install still proceeds.
+                logger.warning("failed to parse apk manifest: %s", e)
+                package_name = None
+                main_activity = None
 
         device_dst = f"/data/local/tmp/{package_name or 'unknown'}.apk"
         dprint(f'push apk to device: {device_dst}')
